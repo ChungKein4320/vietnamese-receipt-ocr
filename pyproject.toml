@@ -1,0 +1,10 @@
+[project]
+name = "vietnamese-receipt-ocr"
+version = "0.1.0"
+description = "End-to-end OCR and information extraction system for Vietnamese receipts and invoices."
+readme = "README.md"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

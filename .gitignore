@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+data/raw/receipts/*
+data/processed/images/*
+data/ocr_outputs/*
+data/extracted_results/*
+database/*.db
+
+# Keep folder structure
+!data/raw/receipts/.gitkeep
+!data/processed/images/.gitkeep
+!data/ocr_outputs/.gitkeep
+!data/extracted_results/.gitkeep
+!data/sample/.gitkeep
+
+# Logs
+*.log
+
+# Environment
+.env
