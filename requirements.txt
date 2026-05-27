@@ -1,9 +1,9 @@
 streamlit
-opencv-python
+opencv-python==4.6.0.66
 pillow
 pandas
-numpy
-paddleocr
-paddlepaddle
+numpy==1.26.4
+paddlepaddle==2.6.2
+paddleocr==2.7.3
 python-dotenv
 pytest
