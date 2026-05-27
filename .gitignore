@@ -27,6 +27,7 @@ data/extracted_results/*
 database/*.db
 data/ground_truth/*
 data/dataset_manifest.csv
+data/evaluation/*
 
 # Keep folder structure
 !data/raw/receipts/.gitkeep
@@ -35,6 +36,7 @@ data/dataset_manifest.csv
 !data/extracted_results/.gitkeep
 !data/sample/.gitkeep
 !data/ground_truth/.gitkeep
+!data/evaluation/.gitkeep
 
 # Archives
 *.zip
