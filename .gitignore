@@ -25,6 +25,8 @@ data/processed/images/*
 data/ocr_outputs/*
 data/extracted_results/*
 database/*.db
+data/ground_truth/*
+data/dataset_manifest.csv
 
 # Keep folder structure
 !data/raw/receipts/.gitkeep
@@ -32,6 +34,10 @@ database/*.db
 !data/ocr_outputs/.gitkeep
 !data/extracted_results/.gitkeep
 !data/sample/.gitkeep
+!data/ground_truth/.gitkeep
+
+# Archives
+*.zip
 
 # Logs
 *.log
