@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import re
 import sys
@@ -27,7 +28,6 @@ def inject_custom_css() -> None:
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-        /* ── Global ── */
         html, body, [class*="css"] {
             font-family: 'Inter', sans-serif;
         }
@@ -35,14 +35,13 @@ def inject_custom_css() -> None:
         .block-container {
             padding-top: 1.75rem;
             padding-bottom: 3rem;
-            max-width: 1300px;
+            max-width: 1320px;
         }
 
-        /* ── Hero ── */
         .hero-card {
             padding: 2.25rem 2.5rem;
             border-radius: 20px;
-            background: linear-gradient(135deg, #0a0f1e 0%, #0d1b35 40%, #0f2a4a 75%, #0a3a4a 100%);
+            background: linear-gradient(135deg, #0a0f1e 0%, #0d1b35 42%, #0f2a4a 76%, #0a3a4a 100%);
             border: 1px solid rgba(6, 182, 212, 0.18);
             color: #f0f6ff;
             margin-bottom: 1.75rem;
@@ -54,10 +53,12 @@ def inject_custom_css() -> None:
         .hero-card::before {
             content: "";
             position: absolute;
-            top: -60px; right: -60px;
-            width: 260px; height: 260px;
+            top: -70px;
+            right: -70px;
+            width: 280px;
+            height: 280px;
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(6,182,212,0.12) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(6,182,212,0.14) 0%, transparent 70%);
             pointer-events: none;
         }
 
@@ -65,13 +66,13 @@ def inject_custom_css() -> None:
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
-            padding: 0.3rem 0.85rem;
+            padding: 0.32rem 0.85rem;
             border-radius: 999px;
             background: rgba(6, 182, 212, 0.12);
             border: 1px solid rgba(6, 182, 212, 0.35);
             color: #67e8f9;
             font-size: 0.78rem;
-            font-weight: 600;
+            font-weight: 650;
             letter-spacing: 0.03em;
             margin-bottom: 0.9rem;
         }
@@ -79,7 +80,7 @@ def inject_custom_css() -> None:
         .hero-title {
             font-size: 2rem;
             font-weight: 800;
-            line-height: 1.2;
+            line-height: 1.18;
             margin-bottom: 0.55rem;
             color: #ffffff;
             letter-spacing: -0.02em;
@@ -88,17 +89,16 @@ def inject_custom_css() -> None:
         .hero-subtitle {
             font-size: 0.97rem;
             color: #94a3b8;
-            max-width: 780px;
+            max-width: 850px;
             line-height: 1.65;
         }
 
-        /* ── Section Card ── */
         .section-card {
             padding: 1.35rem 1.5rem;
             border-radius: 16px;
             background: #0d1117;
             border: 1px solid #1e2d3d;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.30);
             margin-bottom: 1rem;
             color: #e2e8f0;
             transition: border-color 0.2s ease;
@@ -108,15 +108,14 @@ def inject_custom_css() -> None:
             border-color: rgba(6, 182, 212, 0.25);
         }
 
-        .section-card h1, .section-card h2,
-        .section-card h3, .section-card h4,
-        .section-card p, .section-card li,
-        .section-card span { color: #e2e8f0 !important; }
-
-        .section-card h4 {
-            font-size: 0.95rem;
-            font-weight: 700;
-            letter-spacing: -0.01em;
+        .section-card h1,
+        .section-card h2,
+        .section-card h3,
+        .section-card h4,
+        .section-card p,
+        .section-card li,
+        .section-card span {
+            color: #e2e8f0 !important;
         }
 
         .small-muted {
@@ -125,7 +124,6 @@ def inject_custom_css() -> None:
             line-height: 1.6;
         }
 
-        /* ── Badges ── */
         .status-pill {
             display: inline-flex;
             align-items: center;
@@ -134,7 +132,7 @@ def inject_custom_css() -> None:
             border-radius: 999px;
             background: rgba(16, 185, 129, 0.1);
             color: #6ee7b7 !important;
-            font-weight: 600;
+            font-weight: 650;
             font-size: 0.8rem;
             border: 1px solid rgba(16, 185, 129, 0.3);
         }
@@ -153,7 +151,7 @@ def inject_custom_css() -> None:
             border-radius: 999px;
             background: rgba(245, 158, 11, 0.1);
             color: #fcd34d !important;
-            font-weight: 600;
+            font-weight: 650;
             font-size: 0.8rem;
             border: 1px solid rgba(245, 158, 11, 0.3);
         }
@@ -163,58 +161,58 @@ def inject_custom_css() -> None:
             font-size: 0.75rem;
         }
 
-        /* ── Metric Card ── */
         .metric-card {
-            padding: 1.1rem 1.25rem;
+            padding: 1.05rem 1.15rem;
             border-radius: 14px;
             background: #0d1117;
             border: 1px solid #1e2d3d;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
             height: 100%;
+            min-height: 96px;
             transition: border-color 0.2s, transform 0.15s;
         }
 
         .metric-card:hover {
-            border-color: rgba(6, 182, 212, 0.3);
+            border-color: rgba(6, 182, 212, 0.32);
             transform: translateY(-1px);
         }
 
         .metric-label {
-            color: #475569;
-            font-size: 0.72rem;
-            font-weight: 700;
+            color: #64748b;
+            font-size: 0.70rem;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.07em;
+            letter-spacing: 0.075em;
             margin-bottom: 0.45rem;
         }
 
         .metric-value {
             color: #f1f5f9;
-            font-size: 1rem;
-            font-weight: 700;
+            font-size: 0.98rem;
+            font-weight: 750;
             word-break: break-word;
+            overflow-wrap: anywhere;
             line-height: 1.35;
         }
 
-        /* ── Pipeline Steps ── */
         .pipeline-step {
             display: flex;
             align-items: center;
             gap: 0.85rem;
-            padding: 0.7rem 1rem;
+            padding: 0.72rem 1rem;
             border-radius: 12px;
             background: #0d1117;
             border: 1px solid #1e2d3d;
-            margin-bottom: 0.45rem;
+            margin-bottom: 0.48rem;
             color: #cbd5e1;
             font-size: 0.875rem;
-            font-weight: 500;
+            font-weight: 550;
             transition: background 0.15s, border-color 0.15s;
         }
 
         .pipeline-step:hover {
             background: #111827;
-            border-color: rgba(6, 182, 212, 0.2);
+            border-color: rgba(6, 182, 212, 0.25);
         }
 
         .pipeline-step-num {
@@ -232,49 +230,185 @@ def inject_custom_css() -> None:
             flex-shrink: 0;
         }
 
-        /* ── Buttons ── */
-        .stButton > button {
-            border-radius: 10px !important;
-            font-weight: 600 !important;
-            font-size: 0.9rem !important;
-            min-height: 2.75rem !important;
-            letter-spacing: 0.01em;
-            transition: opacity 0.15s, transform 0.1s !important;
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            border-color: #1e2d3d !important;
+            border-radius: 16px !important;
+            background: rgba(13, 17, 23, 0.35) !important;
+            overflow: visible !important;
         }
 
-        .stButton > button:hover { transform: translateY(-1px); }
-        .stButton > button:active { transform: translateY(0); }
-
-        .stDownloadButton > button {
-            border-radius: 10px !important;
-            font-weight: 600 !important;
-            font-size: 0.875rem !important;
-            min-height: 2.75rem !important;
-        }
-
-        /* ── Native Metric ── */
         div[data-testid="stMetric"] {
             background: #0d1117 !important;
-            padding: 1rem 1.25rem !important;
+            padding: 0.95rem 1.1rem !important;
             border-radius: 14px !important;
             border: 1px solid #1e2d3d !important;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important;
         }
 
-        div[data-testid="stMetric"] label { color: #475569 !important; font-size: 0.78rem !important; font-weight: 700 !important; text-transform: uppercase; letter-spacing: 0.06em; }
-        div[data-testid="stMetric"] [data-testid="stMetricValue"] { color: #f1f5f9 !important; font-weight: 700 !important; }
+        div[data-testid="stMetric"] label {
+            color: #64748b !important;
+            font-size: 0.72rem !important;
+            font-weight: 800 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.065em;
+        }
 
-        /* ── Tabs ── */
+        div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+            color: #f1f5f9 !important;
+            font-size: 1.15rem !important;
+            font-weight: 750 !important;
+        }
+
+        /*
+        Style only normal st.button widgets.
+        Do not target stBaseButton globally because file_uploader uses internal buttons.
+        */
+        div[data-testid="stButton"] {
+            margin-top: 1rem !important;
+            width: 100% !important;
+            border-radius: 12px !important;
+            overflow: visible !important;
+        }
+
+        div[data-testid="stButton"] button {
+            width: 100% !important;
+            min-height: 2.9rem !important;
+            border-radius: 12px !important;
+            clip-path: inset(0 round 12px) !important;
+            -webkit-clip-path: inset(0 round 12px) !important;
+            overflow: hidden !important;
+            background-clip: padding-box !important;
+            box-sizing: border-box !important;
+            font-weight: 750 !important;
+            font-size: 0.94rem !important;
+            letter-spacing: 0.01em !important;
+            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%) !important;
+            color: #ffffff !important;
+            border: 1px solid rgba(103, 232, 249, 0.45) !important;
+            box-shadow: 0 10px 24px rgba(6, 182, 212, 0.18) !important;
+            transition: opacity 0.15s, transform 0.1s, background 0.15s !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        div[data-testid="stButton"] button * {
+            color: #ffffff !important;
+            fill: #ffffff !important;
+        }
+
+        div[data-testid="stButton"] button p {
+            color: #ffffff !important;
+            font-weight: 750 !important;
+            margin: 0 !important;
+        }
+
+        div[data-testid="stButton"] button:hover {
+            background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%) !important;
+            color: #ffffff !important;
+            transform: translateY(-1px);
+            border-radius: 12px !important;
+            clip-path: inset(0 round 12px) !important;
+            -webkit-clip-path: inset(0 round 12px) !important;
+        }
+
+        div[data-testid="stButton"] button:active {
+            transform: translateY(0);
+            border-radius: 12px !important;
+            clip-path: inset(0 round 12px) !important;
+            -webkit-clip-path: inset(0 round 12px) !important;
+        }
+
+        div[data-testid="stButton"] button:focus {
+            color: #ffffff !important;
+            border-radius: 12px !important;
+            clip-path: inset(0 round 12px) !important;
+            -webkit-clip-path: inset(0 round 12px) !important;
+        }
+
+        /*
+        Download buttons get the same visual style as Run/Save.
+        This targets only st.download_button, not file_uploader internal controls.
+        */
+        div[data-testid="stDownloadButton"] {
+            margin-top: 1rem !important;
+            width: 100% !important;
+            border-radius: 12px !important;
+            overflow: visible !important;
+        }
+
+        div[data-testid="stDownloadButton"] button,
+        .stDownloadButton > button {
+            width: 100% !important;
+            min-height: 2.9rem !important;
+            border-radius: 12px !important;
+            clip-path: inset(0 round 12px) !important;
+            -webkit-clip-path: inset(0 round 12px) !important;
+            overflow: hidden !important;
+            background-clip: padding-box !important;
+            box-sizing: border-box !important;
+            font-weight: 750 !important;
+            font-size: 0.94rem !important;
+            letter-spacing: 0.01em !important;
+            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%) !important;
+            color: #ffffff !important;
+            border: 1px solid rgba(103, 232, 249, 0.45) !important;
+            box-shadow: 0 10px 24px rgba(6, 182, 212, 0.18) !important;
+            transition: opacity 0.15s, transform 0.1s, background 0.15s !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        div[data-testid="stDownloadButton"] button *,
+        .stDownloadButton > button * {
+            color: #ffffff !important;
+            fill: #ffffff !important;
+        }
+
+        div[data-testid="stDownloadButton"] button p,
+        .stDownloadButton > button p {
+            color: #ffffff !important;
+            font-weight: 750 !important;
+            margin: 0 !important;
+        }
+
+        div[data-testid="stDownloadButton"] button:hover,
+        .stDownloadButton > button:hover {
+            background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%) !important;
+            color: #ffffff !important;
+            transform: translateY(-1px);
+            border-radius: 12px !important;
+            clip-path: inset(0 round 12px) !important;
+            -webkit-clip-path: inset(0 round 12px) !important;
+        }
+
+        div[data-testid="stDownloadButton"] button:active,
+        .stDownloadButton > button:active {
+            transform: translateY(0);
+            border-radius: 12px !important;
+            clip-path: inset(0 round 12px) !important;
+            -webkit-clip-path: inset(0 round 12px) !important;
+        }
+
+        div[data-testid="stDownloadButton"] button:focus,
+        .stDownloadButton > button:focus {
+            color: #ffffff !important;
+            border-radius: 12px !important;
+            clip-path: inset(0 round 12px) !important;
+            -webkit-clip-path: inset(0 round 12px) !important;
+        }
+
         div[data-testid="stTabs"] [role="tablist"] {
             gap: 0.25rem;
             border-bottom: 1px solid #1e2d3d;
         }
 
         div[data-testid="stTabs"] button {
-            font-weight: 600 !important;
-            font-size: 0.875rem !important;
+            font-weight: 650 !important;
+            font-size: 0.9rem !important;
             border-radius: 8px 8px 0 0 !important;
-            padding: 0.5rem 1rem !important;
+            padding: 0.55rem 1rem !important;
             color: #64748b !important;
             transition: color 0.15s !important;
         }
@@ -284,16 +418,25 @@ def inject_custom_css() -> None:
             border-bottom: 2px solid #06b6d4 !important;
         }
 
-        /* ── Sidebar ── */
         [data-testid="stSidebar"] {
             background: #080c14 !important;
             border-right: 1px solid #1a2332 !important;
         }
 
-        [data-testid="stSidebar"] .stMarkdown p { color: #94a3b8 !important; font-size: 0.875rem; }
+        [data-testid="stSidebar"] .stMarkdown p {
+            color: #94a3b8 !important;
+            font-size: 0.875rem;
+        }
+
         [data-testid="stSidebar"] h1,
         [data-testid="stSidebar"] h2,
-        [data-testid="stSidebar"] h3 { color: #e2e8f0 !important; font-size: 0.8rem !important; font-weight: 700 !important; text-transform: uppercase; letter-spacing: 0.06em; }
+        [data-testid="stSidebar"] h3 {
+            color: #e2e8f0 !important;
+            font-size: 0.8rem !important;
+            font-weight: 800 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
 
         .sidebar-status-row {
             display: flex;
@@ -304,11 +447,23 @@ def inject_custom_css() -> None:
             font-size: 0.83rem;
         }
 
-        .sidebar-status-label { color: #64748b; }
-        .sidebar-status-value { color: #e2e8f0; font-weight: 600; }
-        .sidebar-status-value.ok { color: #6ee7b7; }
+        .sidebar-status-label {
+            color: #64748b;
+        }
 
-        /* ── File Uploader ── */
+        .sidebar-status-value {
+            color: #e2e8f0;
+            font-weight: 650;
+        }
+
+        .sidebar-status-value.ok {
+            color: #6ee7b7;
+        }
+
+        /*
+        File uploader: only style the outer area.
+        Internal buttons are left to Streamlit defaults.
+        */
         [data-testid="stFileUploader"] {
             border-radius: 12px;
         }
@@ -321,17 +476,21 @@ def inject_custom_css() -> None:
         }
 
         [data-testid="stFileUploader"] > div:hover {
-            border-color: rgba(6, 182, 212, 0.4) !important;
+            border-color: rgba(6, 182, 212, 0.42) !important;
         }
 
-        /* ── Dataframe ── */
-        [data-testid="stDataFrame"] { border-radius: 12px; overflow: hidden; }
+        [data-testid="stDataFrame"] {
+            border-radius: 12px;
+            overflow: hidden;
+        }
 
-        /* ── Divider ── */
-        hr { border-color: #1e2d3d !important; }
+        hr {
+            border-color: #1e2d3d !important;
+        }
 
-        /* ── Code block ── */
-        .stCode { border-radius: 10px !important; }
+        .stCode {
+            border-radius: 10px !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -339,12 +498,6 @@ def inject_custom_css() -> None:
 
 
 def sanitize_receipt_id(file_name: str) -> str:
-    """
-    Convert uploaded file name to a safe receipt ID.
-
-    Example:
-        "Receipt 001.png" -> "receipt_001"
-    """
     stem = Path(file_name).stem.lower()
     stem = re.sub(r"[^a-z0-9]+", "_", stem)
     stem = re.sub(r"_+", "_", stem).strip("_")
@@ -356,9 +509,6 @@ def sanitize_receipt_id(file_name: str) -> str:
 
 
 def save_uploaded_file(uploaded_file) -> Path:
-    """
-    Save uploaded image to a temporary local folder so PaddleOCR can read it.
-    """
     TMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
     receipt_id = sanitize_receipt_id(uploaded_file.name)
@@ -404,16 +554,26 @@ def format_money(value) -> str:
         return str(value)
 
 
+def escape_html(value: str) -> str:
+    return html.escape(str(value), quote=True)
+
+
 def render_metric_card(label: str, value: str) -> None:
     st.markdown(
         f"""
         <div class="metric-card">
-            <div class="metric-label">{label}</div>
-            <div class="metric-value">{value}</div>
+            <div class="metric-label">{escape_html(label)}</div>
+            <div class="metric-value">{escape_html(value)}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_file_detail_card(label: str, value: str) -> None:
+    with st.container(border=True):
+        st.caption(label.upper())
+        st.markdown(f"**{value}**")
 
 
 def render_pipeline_card() -> None:
@@ -424,14 +584,16 @@ def render_pipeline_card() -> None:
         ("🗂️", "Extract structured fields"),
         ("💾", "Save to SQLite or export JSON / CSV"),
     ]
+
     steps_html = "".join(
         f'<div class="pipeline-step">'
-        f'<span class="pipeline-step-num">{i+1}</span>'
+        f'<span class="pipeline-step-num">{index + 1}</span>'
         f'<span style="font-size:1rem">{icon}</span>'
-        f'<span>{label}</span>'
+        f'<span>{escape_html(label)}</span>'
         f'</div>'
-        for i, (icon, label) in enumerate(steps)
+        for index, (icon, label) in enumerate(steps)
     )
+
     st.markdown(
         f"""
         <div class="section-card">
@@ -528,7 +690,7 @@ def render_overview(result_dict: dict, items_df: pd.DataFrame) -> None:
             f"""
             <div class="section-card">
                 <span class="warning-pill">Parser warnings</span>
-                <p style="margin-top:0.8rem; margin-bottom:0;">{", ".join(warnings)}</p>
+                <p style="margin-top:0.8rem; margin-bottom:0;">{escape_html(", ".join(warnings))}</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -557,22 +719,20 @@ def render_database_tab(result_dict: dict) -> None:
     left_col, right_col = st.columns([1, 2])
 
     with left_col:
-        st.markdown(
-            """
-            <div class="section-card">
-                <h4 style="margin-top:0;">Save current result</h4>
-                <p class="small-muted">
-                    Save the current extraction result into the local SQLite database.
-                    Existing records with the same receipt ID will be replaced.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        with st.container(border=True):
+            st.markdown("##### Save current result")
+            st.caption(
+                "Save the current extraction result into the local SQLite database. "
+                "Existing records with the same receipt ID will be replaced."
+            )
 
-        if st.button("Save to SQLite", type="primary", use_container_width=True):
-            receipt_db_id = save_extraction_to_db(result_dict, replace=True)
-            st.success(f"Saved with database id={receipt_db_id}")
+            if st.button(
+                "▶ Save to SQLite",
+                use_container_width=True,
+                key="save_to_sqlite_button",
+            ):
+                receipt_db_id = save_extraction_to_db(result_dict, replace=True)
+                st.success(f"Saved with database id={receipt_db_id}")
 
         st.metric("Saved receipts", count_receipts())
 
@@ -580,59 +740,59 @@ def render_database_tab(result_dict: dict) -> None:
         saved_receipts = fetch_all_receipts()
 
         if saved_receipts:
-            st.dataframe(pd.DataFrame(saved_receipts), use_container_width=True, hide_index=True)
+            saved_receipts_df = pd.DataFrame(saved_receipts)
+
+            if "id" in saved_receipts_df.columns:
+                saved_receipts_df = saved_receipts_df.sort_values(
+                    by="id",
+                    ascending=True,
+                )
+
+            st.dataframe(
+                saved_receipts_df,
+                use_container_width=True,
+                hide_index=True,
+            )
         else:
             st.info("No receipts saved yet.")
 
 
-def render_download_tab(result_dict: dict, items_df: pd.DataFrame, receipt_id: str) -> None:
+def render_download_tab(
+    result_dict: dict,
+    items_df: pd.DataFrame,
+    receipt_id: str,
+) -> None:
     st.markdown("#### 📥 Export current extraction")
 
     col_a, col_b = st.columns(2)
 
     with col_a:
-        st.markdown(
-            """
-            <div class="section-card">
-                <h4 style="margin-top:0; color:#67e8f9 !important;">
-                    { } &nbsp;Structured JSON
-                </h4>
-                <p class="small-muted">Download all extracted fields and parser metadata.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        with st.container(border=True):
+            st.markdown("##### Structured JSON")
+            st.caption("Download all extracted fields and parser metadata.")
 
-        st.download_button(
-            label="⬇ Download JSON",
-            data=result_to_json_bytes(result_dict),
-            file_name=f"{receipt_id}_extracted.json",
-            mime="application/json",
-            use_container_width=True,
-        )
+            st.download_button(
+                label="⬇ Download JSON",
+                data=result_to_json_bytes(result_dict),
+                file_name=f"{receipt_id}_extracted.json",
+                mime="application/json",
+                use_container_width=True,
+            )
 
     with col_b:
-        st.markdown(
-            """
-            <div class="section-card">
-                <h4 style="margin-top:0; color:#67e8f9 !important;">
-                    ⊞ &nbsp;Items CSV
-                </h4>
-                <p class="small-muted">Download the extracted item table as a spreadsheet.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        with st.container(border=True):
+            st.markdown("##### Items CSV")
+            st.caption("Download the extracted item table as a spreadsheet.")
 
-        csv_bytes = items_df.to_csv(index=False).encode("utf-8-sig")
+            csv_bytes = items_df.to_csv(index=False).encode("utf-8-sig")
 
-        st.download_button(
-            label="⬇ Download CSV",
-            data=csv_bytes,
-            file_name=f"{receipt_id}_items.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
+            st.download_button(
+                label="⬇ Download CSV",
+                data=csv_bytes,
+                file_name=f"{receipt_id}_items.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
 
 
 def main() -> None:
@@ -728,21 +888,31 @@ def main() -> None:
 
             with st.container(border=True):
                 st.markdown("#### 🖼️ Input preview")
-                st.image(image, caption=uploaded_file.name, use_container_width=True)
+                st.image(
+                    image,
+                    caption=uploaded_file.name,
+                    use_container_width=True,
+                )
+
+            with st.container(border=True):
+                st.markdown("#### 📌 File details")
 
                 file_cols = st.columns(3)
 
                 with file_cols[0]:
-                    st.metric("Receipt ID", receipt_id)
+                    render_file_detail_card("Receipt ID", receipt_id)
 
                 with file_cols[1]:
-                    st.metric(
+                    render_file_detail_card(
                         "File type",
                         Path(uploaded_file.name).suffix.lower().replace(".", "").upper(),
                     )
 
                 with file_cols[2]:
-                    st.metric("Image size", f"{image.width} × {image.height}")
+                    render_file_detail_card(
+                        "Image size",
+                        f"{image.width} × {image.height}",
+                    )
 
     with pipeline_col:
         render_pipeline_card()
@@ -754,17 +924,16 @@ def main() -> None:
                 st.info("Upload a receipt image to enable the pipeline.")
                 run_button = False
             else:
+                st.caption("Current receipt")
                 st.markdown(
-                    f'<p class="small-muted" style="margin-bottom:0.4rem;">Current receipt</p>'
-                    f'<p style="color:#67e8f9;font-weight:700;font-size:0.95rem;margin-bottom:0.75rem;">'
-                    f'🗒️ {st.session_state["receipt_id"]}</p>',
+                    f"**🗒️ {escape_html(st.session_state['receipt_id'])}**",
                     unsafe_allow_html=True,
                 )
 
                 run_button = st.button(
                     "▶ Run OCR + Extraction",
-                    type="primary",
                     use_container_width=True,
+                    key="run_ocr_extraction_button",
                 )
 
     if uploaded_file is None:
