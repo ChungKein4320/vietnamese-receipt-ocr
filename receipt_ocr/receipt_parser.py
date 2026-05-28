@@ -364,14 +364,255 @@ def extract_store_name(lines: list[str]) -> str | None:
     return None
 
 
+def _to_24h_hour(hour: int, marker: str | None) -> int:
+    """
+    Convert Vietnamese AM/PM markers to 24-hour format.
+
+    Common markers:
+        SA / AM : morning
+        CH / PM : afternoon/evening
+    """
+    if marker is None:
+        return hour
+
+    normalized_marker = normalize_for_matching(marker)
+
+    if normalized_marker in {"CH", "PM"} and 1 <= hour <= 11:
+        return hour + 12
+
+    if normalized_marker in {"SA", "AM"} and hour == 12:
+        return 0
+
+    return hour
+
+
+def _format_datetime(
+    year: int,
+    month: int,
+    day: int,
+    hour: int | None = None,
+    minute: int | None = None,
+    marker: str | None = None,
+) -> str | None:
+    """
+    Return normalized datetime string if the date/time is valid.
+
+    Output format:
+        YYYY-MM-DD
+        YYYY-MM-DD HH:MM
+    """
+    if not (1 <= day <= 31 and 1 <= month <= 12 and 1900 <= year <= 2100):
+        return None
+
+    if hour is None or minute is None:
+        return f"{year:04d}-{month:02d}-{day:02d}"
+
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        return None
+
+    hour = _to_24h_hour(hour, marker)
+
+    if not (0 <= hour <= 23):
+        return None
+
+    return f"{year:04d}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}"
+
+
+def _parse_date_parts(day_text: str, month_text: str, year_text: str) -> tuple[int, int, int] | None:
+    """
+    Parse date parts from OCR text.
+
+    Supports:
+        dd/mm/yyyy
+        dd.mm.yyyy
+        dd-mm-yyyy
+    """
+    try:
+        day = int(day_text)
+        month = int(month_text)
+        year = int(year_text)
+
+        if year < 100:
+            year += 2000
+
+        return day, month, year
+    except ValueError:
+        return None
+
+
+def _normalize_datetime_ocr_text(line: str) -> str:
+    """
+    Normalize common OCR mistakes in datetime strings.
+
+    Examples:
+        15/08r2020 -> 15/08/2020
+        04.10.202016.19 -> keep as-is; parser handles no-space date/time
+    """
+    text = clean_line(line)
+
+    # OCR sometimes reads "/" before year as "r":
+    #   15/08r2020 -> 15/08/2020
+    text = re.sub(
+        r"(?P<prefix>\d{1,2}[\/.\-]\d{1,2})[rR](?=\d{2,4})",
+        r"\g<prefix>/",
+        text,
+    )
+
+    return text
+
+
+def _extract_datetime_from_line(line: str) -> str | None:
+    """
+    Extract datetime from one OCR line.
+
+    Supported examples:
+        15/08/2020 10:28
+        14/08/202020:36:00
+        04.10.2020 16.21
+        Thi gian:08:42:16-14/08/2020
+        Ngay10/03/202008:01CH-08:01CH)
+    """
+    text = _normalize_datetime_ocr_text(line)
+
+    if not text:
+        return None
+
+    # Avoid phone/contact lines.
+    if _is_contact_or_phone_line(text):
+        return None
+
+    # ------------------------------------------------------------------
+    # Pattern 1: time first, date later
+    # Example:
+    #   Thi gian:08:42:16-14/08/2020
+    #   Thoi gian:09:47:04-15/08/2020
+    # ------------------------------------------------------------------
+    match = re.search(
+        r"(?P<hour>\d{1,2})[:.](?P<minute>\d{2})(?::\d{2})?\s*[-–]\s*"
+        r"(?P<day>\d{1,2})[\/.\-](?P<month>\d{1,2})[\/.\-](?P<year>\d{2,4})",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if match:
+        date_parts = _parse_date_parts(
+            match.group("day"),
+            match.group("month"),
+            match.group("year"),
+        )
+
+        if date_parts:
+            day, month, year = date_parts
+            return _format_datetime(
+                year=year,
+                month=month,
+                day=day,
+                hour=int(match.group("hour")),
+                minute=int(match.group("minute")),
+            )
+
+    # ------------------------------------------------------------------
+    # Pattern 2: date first, time later, possibly without space
+    # Example:
+    #   14/08/202020:36:00
+    #   Ngay10/03/202008:01CH-08:01CH)
+    # ------------------------------------------------------------------
+    match = re.search(
+        r"(?P<day>\d{1,2})[\/.\-](?P<month>\d{1,2})[\/.\-](?P<year>\d{2,4})"
+        r"\s*"
+        r"(?P<hour>\d{1,2})[:.](?P<minute>\d{2})"
+        r"(?::\d{2})?"
+        r"\s*(?P<marker>CH|SA|PM|AM)?",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if match:
+        date_parts = _parse_date_parts(
+            match.group("day"),
+            match.group("month"),
+            match.group("year"),
+        )
+
+        if date_parts:
+            day, month, year = date_parts
+            return _format_datetime(
+                year=year,
+                month=month,
+                day=day,
+                hour=int(match.group("hour")),
+                minute=int(match.group("minute")),
+                marker=match.group("marker"),
+            )
+
+    # ------------------------------------------------------------------
+    # Pattern 3: date first, no time
+    # Example:
+    #   14/08/2020
+    #   06.04.2019
+    # ------------------------------------------------------------------
+    match = re.search(
+        r"(?P<day>\d{1,2})[\/.\-](?P<month>\d{1,2})[\/.\-](?P<year>\d{2,4})",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if match:
+        date_parts = _parse_date_parts(
+            match.group("day"),
+            match.group("month"),
+            match.group("year"),
+        )
+
+        if date_parts:
+            day, month, year = date_parts
+            return _format_datetime(
+                year=year,
+                month=month,
+                day=day,
+            )
+
+    return None
+
+
 def extract_datetime(lines: list[str]) -> str | None:
     """
-    Extract first valid datetime from OCR lines.
+    Extract receipt datetime from OCR lines.
+
+    Version v0.2 improvements:
+    - Supports time-first format: 08:42:16-14/08/2020
+    - Supports date+time without whitespace: 14/08/202020:36:00
+    - Supports Vietnamese PM marker CH: 08:01CH -> 20:01
     """
-    for line in lines:
-        datetime_value = normalize_datetime_value(line)
-        if datetime_value:
-            return datetime_value
+    cleaned_lines = [clean_line(line) for line in lines if clean_line(line)]
+
+    # Pass 1: prioritize lines with explicit datetime keywords.
+    datetime_keywords = [
+        "NGAY",
+        "THOI GIAN",
+        "THDI GIAN",
+        "THI GIAN",
+        "GIO",
+        "GID",
+        "TIME",
+        "DATE",
+    ]
+
+    for line in cleaned_lines:
+        normalized = normalize_for_matching(line)
+
+        if any(keyword in normalized for keyword in datetime_keywords):
+            result = _extract_datetime_from_line(line)
+
+            if result:
+                return result
+
+    # Pass 2: fallback to any line with date/time pattern.
+    for line in cleaned_lines:
+        result = _extract_datetime_from_line(line)
+
+        if result:
+            return result
 
     return None
 
@@ -394,9 +635,33 @@ def _extract_code_from_line(line: str) -> str | None:
 
 def _is_contact_or_phone_line(line: str) -> bool:
     """
-    Detect phone/contact lines that should not be used as invoice IDs.
+    Detect phone/contact lines that should not be used as invoice IDs or datetime.
+
+    Important:
+    Numeric datetime lines such as `04.10.202016.19` must not be treated
+    as phone numbers.
     """
-    normalized = normalize_for_matching(line)
+    text = clean_line(line)
+
+    if not text:
+        return False
+
+    # Do not classify date/datetime-like lines as phone/contact lines.
+    # Examples:
+    #   04.10.202016.19
+    #   14/08/202020:36:00
+    #   09:47:21-15/08r2020
+    has_date_like_pattern = bool(
+        re.search(
+            r"\d{1,2}[\/.\-]\d{1,2}[\/.\-rR]\d{2,4}",
+            text,
+        )
+    )
+
+    if has_date_like_pattern:
+        return False
+
+    normalized = normalize_for_matching(text)
 
     contact_keywords = [
         "TEL",
@@ -412,9 +677,9 @@ def _is_contact_or_phone_line(line: str) -> bool:
 
     # Standalone phone-like lines, for example:
     # 0869322496-02438765210
-    compact_digits = re.sub(r"\D", "", line)
+    compact_digits = re.sub(r"\D", "", text)
 
-    if len(compact_digits) >= 9 and re.fullmatch(r"[\d\s().+-]+", line.strip()):
+    if len(compact_digits) >= 9 and re.fullmatch(r"[\d\s().+-]+", text.strip()):
         return True
 
     return False
