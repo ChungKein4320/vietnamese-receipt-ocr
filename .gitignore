@@ -46,3 +46,6 @@ data/evaluation/*
 
 # Environment
 .env
+
+# Streamlit local temp files
+.tmp_streamlit/
