@@ -49,3 +49,6 @@ data/evaluation/*
 
 # Streamlit local temp files
 .tmp_streamlit/
+
+# Debug inspection outputs
+docs/inspect_*.txt

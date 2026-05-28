@@ -392,53 +392,271 @@ def _extract_code_from_line(line: str) -> str | None:
     return None
 
 
-def extract_invoice_id(lines: list[str]) -> str | None:
+def _is_contact_or_phone_line(line: str) -> bool:
     """
-    Extract invoice ID or receipt code.
+    Detect phone/contact lines that should not be used as invoice IDs.
+    """
+    normalized = normalize_for_matching(line)
 
-    This is intentionally conservative and prioritizes alphanumeric codes.
-    """
-    invoice_keywords = [
-        "SO HD",
-        "SO HOA DON",
-        "HOA DON",
-        "HOA ON",
-        "MA HD",
-        "MA HOA DON",
-        "INVOICE",
-        "BILL",
-        "RECEIPT",
-        "ORDER",
+    contact_keywords = [
+        "TEL",
+        "DT",
+        "DIEN THOAI",
+        "FAX",
+        "HOTLINE",
+        "PHONE",
     ]
 
-    for index, line in enumerate(lines[:30]):
-        normalized = normalize_for_matching(line)
+    if any(keyword in normalized for keyword in contact_keywords):
+        return True
 
-        if any(keyword in normalized for keyword in invoice_keywords):
-            code = _extract_code_from_line(line)
-            if code:
-                return code
+    # Standalone phone-like lines, for example:
+    # 0869322496-02438765210
+    compact_digits = re.sub(r"\D", "", line)
 
-            for next_line in lines[index + 1 : index + 5]:
-                code = _extract_code_from_line(next_line)
-                if code:
-                    return code
+    if len(compact_digits) >= 9 and re.fullmatch(r"[\d\s().+-]+", line.strip()):
+        return True
 
-                if is_probable_barcode(next_line):
-                    continue
+    return False
 
-    for line in lines[:30]:
-        normalized = normalize_for_matching(line)
 
-        if "NVBH" in normalized or "HOTLINE" in normalized:
+def _normalize_invoice_id_candidate(candidate: str, context_line: str = "") -> str | None:
+    """
+    Normalize common OCR mistakes in invoice ID candidates.
+
+    Examples:
+        S6-32              -> SO-32
+        s6-31              -> SO-31
+        S6SON55598         -> SON55598
+        SHD:19810000682020 -> I9810000682020
+    """
+    if not candidate:
+        return None
+
+    raw = clean_line(candidate)
+    raw = raw.strip(" :;,.|")
+
+    if not raw:
+        return None
+
+    # Remove common labels if they were captured together with the value.
+    raw = re.sub(
+        r"^(?:SO\s*HOA\s*DON|SO\s*CHUNG\s*TU|SOCHUNG\s*TU|SOCHUNGTU|SOHD|S6HD|SHD|HD)\s*[:\-]?\s*",
+        "",
+        raw,
+        flags=re.IGNORECASE,
+    )
+
+    raw = raw.strip(" :;,.|")
+
+    if not raw:
+        return None
+
+    # Keep only invoice-safe characters.
+    value = re.sub(r"[^A-Za-z0-9.\-]", "", raw)
+
+    if not value:
+        return None
+
+    # S6-32 / S0-32 / SO-32 -> SO-32
+    value = re.sub(r"^S[60O]-?(\d{1,6})$", r"SO-\1", value, flags=re.IGNORECASE)
+
+    # S6SON55598 / S0SON55598 -> SON55598
+    value = re.sub(r"^S[60O](SON\d{4,})$", r"\1", value, flags=re.IGNORECASE)
+
+    # Normalize lowercase.
+    value = value.upper()
+
+    # SHD line sometimes OCRs I981... as 1981...
+    # Example: SHD:19810000682020 -> I9810000682020
+    context_normalized = normalize_for_matching(context_line)
+
+    if "SHD" in context_normalized and re.fullmatch(r"1\d{10,}", value):
+        value = "I" + value[1:]
+
+    # Avoid obvious contact leftovers.
+    if "FAX" in value or "TEL" in value:
+        return None
+
+    # Reject very short or label-only values.
+    if value in {"SO", "S6", "S0", "HD", "SHD", "SOHD", "S6HD"}:
+        return None
+
+    if len(value) < 4:
+        return None
+
+    return value
+
+
+def _has_invoice_label(line: str) -> bool:
+    """
+    Detect lines that indicate an invoice/receipt code may appear on
+    the same line or the following line.
+    """
+    if _is_contact_or_phone_line(line):
+        return False
+
+    normalized = normalize_for_matching(line)
+    normalized_clean = re.sub(r"[^A-Z0-9]+", " ", normalized)
+    normalized_clean = re.sub(r"\s+", " ", normalized_clean).strip()
+
+    # Exclude misleading phrases.
+    excluded_phrases = [
+        "SO KHACH",
+        "SO CHO",
+        "TONG SO",
+        "SO LUONG",
+    ]
+
+    if any(phrase in normalized_clean for phrase in excluded_phrases):
+        return False
+
+    label_patterns = [
+        r"\bSO HOA DON\b",
+        r"\bSO CHUNG TU\b",
+        r"\bSOCHUNG TU\b",
+        r"\bSOCHUNGTU\b",
+        r"\bSOHD\b",
+        r"\bS6HD\b",
+        r"\bSHD\b",
+        r"\bHD\b",
+        r"^SO$",
+        r"^S6$",
+        r"^SO[:\s]*",
+        r"^S6[:\s]*",
+    ]
+
+    return any(re.search(pattern, normalized_clean) for pattern in label_patterns)
+
+
+def _extract_invoice_from_labeled_line(line: str) -> str | None:
+    """
+    Extract invoice ID from lines that contain labels such as:
+        So:2003000468
+        So hoa don
+        SHD:19810000682020
+    """
+    if _is_contact_or_phone_line(line):
+        return None
+
+    patterns = [
+        r"\b(?:SO|S6)\s*HOA\s*DON\s*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9.\-]{2,})",
+        r"\b(?:SO|S6)\s*CHUNG\s*TU\s*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9.\-]{2,})",
+        r"\bSOCHUNG\s*TU\s*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9.\-]{2,})",
+        r"\bSOCHUNGTU\s*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9.\-]{2,})",
+        r"\bSHD\s*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9.\-]{2,})",
+        r"\b(?:SOHD|S6HD)\s*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9.\-]{2,})",
+        r"\bHD\s*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9.\-]{4,})",
+        r"\b(?:SO|S6)\s*[:\-]\s*([A-Za-z0-9][A-Za-z0-9.\-]{2,})",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, line, flags=re.IGNORECASE)
+
+        if match:
+            candidate = _normalize_invoice_id_candidate(
+                match.group(1),
+                context_line=line,
+            )
+
+            if candidate:
+                return candidate
+
+    return None
+
+
+def _extract_direct_invoice_candidate(line: str, allow_bare_number: bool = False) -> str | None:
+    """
+    Extract direct invoice-like patterns from an OCR line.
+    """
+    if _is_contact_or_phone_line(line):
+        return None
+
+    direct_patterns = [
+        # BL.200814.1.00046
+        r"\bBL[.\-]\d{6}[A-Za-z0-9.\-]*\b",
+
+        # SO-32, S6-32, s6-31
+        r"\bS[O06]-\d{1,6}\b",
+
+        # SON55296, S6SON55598
+        r"\bS[O06]?SON\d{4,}\b",
+
+        # H00133765, HD00197593
+        r"\bHD?\d{5,}\b",
+
+        # I00022-550301, I9810000682020
+        r"\bI\d{4,}(?:-\d+)?\b",
+    ]
+
+    for pattern in direct_patterns:
+        match = re.search(pattern, line, flags=re.IGNORECASE)
+
+        if match:
+            candidate = _normalize_invoice_id_candidate(
+                match.group(0),
+                context_line=line,
+            )
+
+            if candidate:
+                return candidate
+
+    # Numeric-only invoice IDs are allowed only near a label.
+    # This avoids taking phone numbers as invoice IDs.
+    if allow_bare_number:
+        match = re.search(r"\b\d{8,}\b", line)
+
+        if match:
+            candidate = _normalize_invoice_id_candidate(
+                match.group(0),
+                context_line=line,
+            )
+
+            if candidate:
+                return candidate
+
+    return None
+
+
+def extract_invoice_id(lines: list[str]) -> str | None:
+    """
+    Extract invoice / receipt ID from OCR lines.
+
+    Version v0.2 improvements:
+    - Support invoice IDs after labels such as "So hoa don".
+    - Normalize OCR confusion S6/SO in receipt codes.
+    - Support BL.*, SON*, H*, HD*, I* formats.
+    - Avoid false positives from phone/fax/contact lines.
+    """
+    cleaned_lines = [clean_line(line) for line in lines if clean_line(line)]
+
+    # Pass 1: same-line label extraction.
+    for line in cleaned_lines:
+        candidate = _extract_invoice_from_labeled_line(line)
+
+        if candidate:
+            return candidate
+
+    # Pass 2: label line followed by candidate in next few lines.
+    for index, line in enumerate(cleaned_lines):
+        if not _has_invoice_label(line):
             continue
 
-        code = _extract_code_from_line(line)
-        if code:
-            return code
+        for next_line in cleaned_lines[index + 1 : index + 4]:
+            candidate = _extract_direct_invoice_candidate(
+                next_line,
+                allow_bare_number=True,
+            )
 
-        if is_probable_barcode(line):
-            continue
+            if candidate:
+                return candidate
+
+    # Pass 3: direct invoice-like patterns.
+    for line in cleaned_lines:
+        candidate = _extract_direct_invoice_candidate(line)
+
+        if candidate:
+            return candidate
 
     return None
 
