@@ -2,34 +2,56 @@
 
 An end-to-end OCR and information extraction system for Vietnamese receipts and invoices.
 
-The system takes a receipt image as input, runs OCR, extracts structured fields, displays the result in a Streamlit UI, saves records to SQLite, and supports CSV/JSON export.
+The system takes a receipt image as input, runs OCR, extracts structured receipt fields, displays the result in a Streamlit UI, saves records to SQLite, and supports JSON/CSV export.
+
+## Demo
+
+### Upload and receipt preview
+
+![Upload and Preview](docs/screenshots/01_upload_and_preview.png)
+
+### Extraction overview
+
+![Extraction Overview](docs/screenshots/02_extraction_overview.png)
+
+### Extracted item table
+
+![Items Table](docs/screenshots/03_items_table.png)
+
+### SQLite database view
+
+![Database View](docs/screenshots/04_database_view.png)
+
+### JSON/CSV export
+
+![Download Export](docs/screenshots/05_download_export.png)
 
 ## Features
 
-* Upload receipt/invoice images
-* Run OCR using PaddleOCR
-* Extract structured receipt fields using a rule-based parser
-* Display raw OCR text
-* Display structured JSON output
-* Display extracted item table
-* Save extraction results to SQLite
-* Export receipt-level and item-level data to CSV
-* Evaluate extraction quality against ground truth annotations
+* Upload Vietnamese receipt/invoice images.
+* Run OCR using PaddleOCR.
+* Extract structured receipt information with a rule-based parser.
+* Display raw OCR text for debugging.
+* Display structured JSON output.
+* Display extracted item table.
+* Save extraction results to SQLite.
+* Export receipt-level and item-level data to JSON/CSV.
+* Evaluate extraction quality against manually created ground truth labels.
 
 ## Extracted Fields
 
 The current parser extracts:
 
-* Store name / seller name
-* Date and time
-* Invoice ID / receipt code
-* Item list
-* Quantity
-* Unit price
-* Line total
+* store name / seller name
+* date and time
+* invoice ID / receipt code
+* item list
+* quantity
+* unit price
+* line total
 * VAT / service fee, if available
-* Total amount
-* Payment method
+* total amount
+* payment method
 
 ## Tech Stack
 
@@ -66,6 +88,7 @@ vietnamese-receipt-ocr/
 ├── database/
 │
 ├── docs/
+│   ├── screenshots/
 │   ├── dataset_strategy.md
 │   ├── evaluation.md
 │   └── mvp_scope.md
@@ -133,7 +156,7 @@ pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
 ```
 
-Verify installation:
+Verify the OCR installation:
 
 ```powershell
 python -c "import paddle; print('paddle:', paddle.__version__)"
@@ -227,16 +250,14 @@ The app supports:
 
 * receipt image upload
 * OCR execution
-* extraction execution
-* JSON display
-* item table display
-* raw OCR text display
-* saving results to SQLite
-* downloading extracted JSON and item CSV
+* rule-based extraction
+* JSON preview
+* item table preview
+* raw OCR text debugging
+* SQLite save
+* JSON/CSV download
 
-## Streamlit Demo
-
-The Streamlit UI provides an end-to-end demo flow:
+## Streamlit App Flow
 
 ```text
 Upload image
@@ -249,7 +270,11 @@ Upload image
 
 ## Evaluation
 
-The current evaluation set contains 15 Vietnamese receipt/invoice images with manually created ground truth JSON files.
+The current evaluation set contains:
+
+* 15 Vietnamese receipt/invoice images
+* 15 manually created ground truth JSON files
+* multiple receipt layouts, including retail, coffee shop, bookstore, restaurant, and small shop receipts
 
 Current parser version:
 
@@ -271,7 +296,7 @@ Current field-level results:
 
 ## Key Findings
 
-`total_amount` performs best after improving money normalization. The parser can handle Vietnamese-style currency formats such as:
+`total_amount` is currently the strongest field after improving money normalization. The parser can handle Vietnamese-style currency formats such as:
 
 ```text
 70.000d
@@ -280,66 +305,79 @@ Current field-level results:
 CASH(VND)-88000
 ```
 
-`invoice_id` remains the weakest field because receipt codes have inconsistent formats and are often confused with phone numbers, cashier IDs, or transaction codes.
+`invoice_id` remains the weakest field because receipt IDs have inconsistent formats and are often confused with phone numbers, cashier IDs, transaction IDs, or store metadata.
 
-`items_count` is challenging because different receipt layouts split item names, quantities, unit prices, and line totals across different OCR lines.
+`items_count` is challenging because receipt layouts differ significantly. Some receipts split item names, quantities, unit prices, and line totals across separate OCR lines.
 
 ## Data Privacy and Git Tracking
 
-Private receipt images, ground truth labels, OCR outputs, extracted outputs, evaluation reports, and SQLite databases are ignored by Git.
+Private or local data is ignored by Git.
 
 Ignored local data includes:
 
 ```text
 data/raw/receipts/*
-data/ground_truth/*
+data/processed/images/*
 data/ocr_outputs/*
 data/extracted_results/*
+data/ground_truth/*
 data/evaluation/*
+data/dataset_manifest.csv
 database/*.db
+.tmp_streamlit/
 ```
 
-Only placeholder `.gitkeep` files are committed to preserve folder structure.
+Only placeholder `.gitkeep` files and documentation screenshots are committed.
 
 ## Limitations
 
 * OCR errors propagate into the parser.
 * The parser is rule-based and sensitive to layout variation.
-* Item-level evaluation is not implemented yet.
 * Invoice ID extraction is still weak.
+* Item extraction is layout-sensitive.
+* Current item evaluation only checks item count, not item-level correctness.
 * Payment method extraction depends on keyword matching.
-* The current evaluation dataset is small and intended for MVP evaluation, not production benchmarking.
-* The system does not currently use layout-aware models or document understanding models.
+* The current dataset is small and intended for MVP evaluation, not production benchmarking.
+* The system does not currently use layout-aware document understanding models.
 
-## Future Improvements
+## Roadmap
+
+This project is not finished at the MVP stage. The current version is a working baseline, and future improvements should focus on extraction quality.
 
 Planned improvements:
 
-1. Add item-level evaluation.
+1. Add detailed item-level evaluation.
 2. Improve invoice ID extraction.
-3. Add layout-aware item parsing using OCR bounding boxes.
-4. Add image preprocessing with OpenCV.
-5. Compare PaddleOCR with VietOCR.
-6. Add optional LLM-based parser for difficult receipts.
-7. Add FastAPI backend for API serving.
-8. Add Docker support.
-9. Expand the evaluation dataset.
-10. Add synthetic/anonymized public sample receipts.
+3. Improve payment method detection.
+4. Add layout-aware item parsing using OCR bounding boxes.
+5. Add OpenCV preprocessing experiments.
+6. Compare PaddleOCR with VietOCR.
+7. Add optional LLM-based parser for difficult receipts.
+8. Expand the evaluation dataset.
+9. Add FastAPI backend for API serving.
+10. Add Docker support.
 
 ## Project Status
 
 Current status:
 
 ```text
-MVP completed
+MVP v1 completed
 ```
 
 Implemented:
 
 * OCR baseline
-* Rule-based extraction pipeline
+* rule-based extraction pipeline
 * Streamlit UI
 * SQLite storage
-* CSV/JSON export
-* Field-level evaluation
-* Documentation
+* JSON/CSV export
+* field-level evaluation
+* documentation
+* demo screenshots
+
+Next phase:
+
+```text
+Improve extraction accuracy and add layout-aware parsing
+```
