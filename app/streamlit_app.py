@@ -14,6 +14,7 @@ sys.path.append(str(PROJECT_ROOT))
 
 from receipt_ocr.ocr_engine import ocr_lines_to_text, run_ocr
 from receipt_ocr.receipt_parser import parse_receipt_text
+from receipt_ocr.database import count_receipts, fetch_all_receipts, save_extraction_to_db
 
 
 TMP_UPLOAD_DIR = PROJECT_ROOT / ".tmp_streamlit"
@@ -190,8 +191,8 @@ def main() -> None:
 
     st.divider()
 
-    tab_json, tab_items, tab_ocr, tab_download = st.tabs(
-        ["Structured JSON", "Items table", "OCR text", "Download"]
+    tab_json, tab_items, tab_ocr, tab_database, tab_download = st.tabs(
+        ["Structured JSON", "Items table", "OCR text", "Database", "Download"]
     )
 
     with tab_json:
@@ -231,6 +232,22 @@ def main() -> None:
                     "lines": ocr_lines,
                 }
             )
+
+    with tab_database:
+        st.markdown("### Save result to SQLite")
+
+        if st.button("Save current extraction to database", use_container_width=True):
+            receipt_db_id = save_extraction_to_db(result_dict, replace=True)
+            st.success(f"Saved to SQLite with database id={receipt_db_id}")
+
+        st.write(f"Total saved receipts: {count_receipts()}")
+
+        saved_receipts = fetch_all_receipts()
+
+        if saved_receipts:
+            st.dataframe(pd.DataFrame(saved_receipts), use_container_width=True)
+        else:
+            st.info("No receipts saved yet.")
 
     with tab_download:
         json_bytes = result_to_json_bytes(result_dict)
