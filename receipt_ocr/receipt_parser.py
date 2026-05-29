@@ -1205,20 +1205,130 @@ def extract_service_fee(lines: list[str]) -> int | None:
 
 def extract_payment_method(lines: list[str]) -> str:
     """
-    Extract payment method into controlled values.
-    """
-    full_text = "\n".join(normalize_for_matching(line) for line in lines)
+    Extract payment method from OCR lines.
 
-    if "TIEN MAT" in full_text or "CASH" in full_text:
+    Supported normalized values:
+        cash
+        card
+        bank_transfer
+        e_wallet
+        unknown
+
+    Version v0.2 improvements:
+    - Detect OCR variants of "tien mat", such as "tien mal".
+    - Infer cash from "khach dua" / "tien thua" / "tra lai" patterns.
+    - Avoid false card detection from store names such as "THE COFFEE HOUSE".
+    - Avoid false bank transfer detection from discount column "CK".
+    """
+    cleaned_lines = [clean_line(line) for line in lines if clean_line(line)]
+    normalized_lines = [normalize_for_matching(line) for line in cleaned_lines]
+
+    full_text = " ".join(normalized_lines)
+    compact_text = re.sub(r"[^A-Z0-9]+", " ", full_text)
+    compact_text = re.sub(r"\s+", " ", compact_text).strip()
+
+    # ------------------------------------------------------------
+    # 1. Cash payment should be detected early.
+    #
+    # This avoids false positives such as:
+    #   THE COFFEE HOUSE -> "THE" should not mean card payment.
+    # ------------------------------------------------------------
+    cash_keywords = [
+        "TIEN MAT",
+        "TIEN MAL",
+        "TIEN MAT VND",
+        "CASH",
+        "CASH VND",
+    ]
+
+    if any(keyword in compact_text for keyword in cash_keywords):
         return "cash"
 
-    if "MOMO" in full_text or "ZALOPAY" in full_text or "VNPAY" in full_text:
+    cash_inference_keywords = [
+        "KHACH DUA",
+        "KHACH TRA",
+        "TIEN THUA",
+        "TIEN TRA LAI",
+        "TRA LAI",
+        "TRA LAI KHACH",
+        "TRA LGI KHACH",
+    ]
+
+    if any(keyword in compact_text for keyword in cash_inference_keywords):
+        return "cash"
+
+    # ------------------------------------------------------------
+    # 2. E-wallet / QR payment.
+    # ------------------------------------------------------------
+    e_wallet_keywords = [
+        "MOMO",
+        "ZALOPAY",
+        "ZALO PAY",
+        "VNPAY",
+        "VN PAY",
+        "VI DIEN TU",
+        "E WALLET",
+        "QUET MA",
+        "QUET QR",
+        "MA QR",
+        "QR CODE",
+    ]
+
+    if any(keyword in compact_text for keyword in e_wallet_keywords):
         return "e_wallet"
 
-    if "CHUYEN KHOAN" in full_text or "BANK TRANSFER" in full_text:
+    # ------------------------------------------------------------
+    # 3. Bank transfer.
+    #
+    # Do NOT use bare "CK" because in receipts it often means
+    # "chiet khau", not "chuyen khoan".
+    # ------------------------------------------------------------
+    bank_transfer_keywords = [
+        "CHUYEN KHOAN",
+        "THANH TOAN CHUYEN KHOAN",
+        "BANK TRANSFER",
+        "TRANSFER",
+        "NGAN HANG",
+        "TAI KHOAN NGAN HANG",
+    ]
+
+    if any(keyword in compact_text for keyword in bank_transfer_keywords):
         return "bank_transfer"
 
-    if "THE" in full_text or "CARD" in full_text or "VISA" in full_text or "MASTERCARD" in full_text:
+    # ------------------------------------------------------------
+    # 4. Card payment.
+    #
+    # Do NOT use bare "THE" because it causes false positives:
+    #   THE COFFEE HOUSE
+    #   THE KHACH HANG
+    #
+    # Only use card-specific contexts.
+    # ------------------------------------------------------------
+    card_keywords = [
+        "QUET THE",
+        "THANH TOAN THE",
+        "TRA THE",
+        "THE ATM",
+        "THE VISA",
+        "THE NAPAS",
+        "VISA",
+        "MASTERCARD",
+        "MASTER CARD",
+        "NAPAS",
+        "POS",
+    ]
+
+    card_exclusion_keywords = [
+        "THE COFFEE HOUSE",
+        "THE KHACH HANG",
+        "ID THE KHACH HANG",
+        "THE THANH VIEN",
+    ]
+
+    has_card_keyword = any(keyword in compact_text for keyword in card_keywords)
+    has_card_exclusion = any(keyword in compact_text for keyword in card_exclusion_keywords)
+
+    if has_card_keyword and not has_card_exclusion:
         return "card"
 
     return "unknown"
