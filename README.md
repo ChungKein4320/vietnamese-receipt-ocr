@@ -40,6 +40,7 @@ The system takes a receipt image as input, runs OCR, extracts structured receipt
 * Export receipt-level and item-level data to JSON/CSV.
 * Evaluate extraction quality against manually created ground truth labels.
 * Inspect OCR bounding boxes for layout-level debugging.
+* Optionally apply OCR text correction to store names and item names.
 
 ## Extracted Fields
 
@@ -63,6 +64,7 @@ The current parser extracts:
 | OCR                    | PaddleOCR                                      |
 | Image handling         | Pillow, OpenCV                                 |
 | Information extraction | Regex + rule-based parser                      |
+| Text correction        | Rule-based OCR text correction                 |
 | UI                     | Streamlit                                      |
 | Database               | SQLite                                         |
 | Data processing        | Pandas                                         |
@@ -84,6 +86,7 @@ vietnamese-receipt-ocr/
 │   │   └── images/
 │   ├── ocr_outputs/
 │   ├── extracted_results/
+│   ├── corrected_results/
 │   ├── ground_truth/
 │   ├── evaluation/
 │   └── sample/
@@ -92,6 +95,7 @@ vietnamese-receipt-ocr/
 │
 ├── docs/
 │   ├── screenshots/
+│   ├── corrected_item_evaluation.md
 │   ├── dataset_strategy.md
 │   ├── error_analysis.md
 │   ├── item_level_evaluation.md
@@ -108,12 +112,15 @@ vietnamese-receipt-ocr/
 │   ├── exporter.py
 │   ├── image_preprocessor.py
 │   ├── ocr_engine.py
+│   ├── ocr_text_corrector.py
 │   ├── receipt_parser.py
 │   ├── schema.py
 │   └── text_normalizer.py
 │
 ├── scripts/
 │   ├── analyze_errors.py
+│   ├── apply_text_correction.py
+│   ├── evaluate_corrected_items.py
 │   ├── evaluate_extraction.py
 │   ├── evaluate_items.py
 │   ├── export_db.py
@@ -147,6 +154,15 @@ Receipt image
 → CSV/JSON export
 → Receipt-level evaluation
 → Item-level evaluation
+```
+
+Optional post-processing pipeline:
+
+```text
+Extracted JSON
+→ Rule-based OCR text correction
+→ Corrected JSON
+→ Corrected item-name evaluation
 ```
 
 ## Installation
@@ -289,7 +305,35 @@ data/evaluation/layout_debug/receipt_004_layout_lines.csv
 data/evaluation/layout_debug/receipt_004_layout_annotated.png
 ```
 
-### 12. Run Streamlit app
+### 12. Apply optional OCR text correction
+
+```powershell
+python scripts/apply_text_correction.py --all
+```
+
+Output:
+
+```text
+data/corrected_results/receipt_001_corrected.json
+data/corrected_results/receipt_002_corrected.json
+...
+```
+
+### 13. Evaluate corrected item names
+
+```powershell
+python scripts/evaluate_corrected_items.py
+```
+
+Output:
+
+```text
+data/evaluation/corrected_item_evaluation_report.csv
+data/evaluation/corrected_item_evaluation_summary.json
+docs/corrected_item_evaluation.md
+```
+
+### 14. Run Streamlit app
 
 ```powershell
 streamlit run app/streamlit_app.py
@@ -357,7 +401,7 @@ rule_based_v0.3
 
 ### Evaluation Artifacts
 
-The project includes two evaluation layers.
+The project includes two core evaluation layers.
 
 ```text
 scripts/evaluate_extraction.py
@@ -430,7 +474,81 @@ Tiền mặt           -> Tien mal
 Thời gian          -> Thi gian
 ```
 
-The current parser handles some OCR errors with deterministic normalization rules. Future work can add an optional OCR text correction layer for item names and store names, while keeping numeric fields, dates, invoice IDs, and barcodes unchanged.
+The current parser handles some OCR errors with deterministic normalization rules. Future work can add a stronger optional OCR text correction layer for item names and store names, while keeping numeric fields, dates, invoice IDs, and barcodes unchanged.
+
+## Optional OCR Text Correction Experiment
+
+This project includes an optional OCR text correction layer for improving the readability of extracted text fields.
+
+The correction layer is intentionally conservative.
+
+It only adds corrected text fields for:
+
+* `store_name`
+* `item.name`
+
+It does not modify:
+
+* invoice ID
+* datetime
+* quantity
+* unit price
+* line total
+* total amount
+* VAT / service fee
+* barcode-like values
+
+This design keeps the deterministic rule-based extraction pipeline stable while allowing text readability improvements as a post-processing step.
+
+### Correction Pipeline
+
+```text
+Extracted JSON
+→ Rule-based text correction
+→ Corrected JSON
+→ Corrected item-name evaluation
+```
+
+Correction output is saved separately under:
+
+```text
+data/corrected_results/
+```
+
+The original extraction output under `data/extracted_results/` is not overwritten.
+
+### Correction Scripts
+
+```text
+scripts/apply_text_correction.py
+```
+
+Applies OCR text correction to extracted JSON files.
+
+```text
+scripts/evaluate_corrected_items.py
+```
+
+Compares raw item names and corrected item names against ground truth.
+
+### Current Correction Result
+
+On the current 39 item rows:
+
+| Metric                             |   Value |
+| ---------------------------------- | ------: |
+| Raw item name accuracy             |  84.62% |
+| Corrected item name accuracy       |  84.62% |
+| Average raw similarity score       |  0.8463 |
+| Average corrected similarity score |  0.8631 |
+| Average score delta                | +0.0169 |
+| Improved rows                      |      13 |
+| Regressed rows                     |       0 |
+| Unchanged rows                     |      26 |
+
+The correction layer does not improve item-name accuracy yet, but it improves average text similarity and readability without causing regression on the current evaluation set.
+
+This confirms that OCR text correction is useful as an optional post-processing layer, but the remaining item-name errors are mostly caused by parser alignment issues rather than spelling mistakes alone.
 
 ## Data Privacy and Git Tracking
 
@@ -443,6 +561,7 @@ data/raw/receipts/*
 data/processed/images/*
 data/ocr_outputs/*
 data/extracted_results/*
+data/corrected_results/*
 data/ground_truth/*
 data/evaluation/*
 data/dataset_manifest.csv
@@ -462,6 +581,7 @@ Only placeholder `.gitkeep` files and documentation screenshots are committed.
 * Store name extraction is still heuristic-based.
 * Invoice ID extraction can still fail when OCR misreads the entire code or when the receipt has no explicit label.
 * Quantity extraction remains weaker than price extraction because some receipts omit quantity or place it in ambiguous columns.
+* The optional OCR text correction layer improves readability and average similarity, but it does not improve item-name accuracy yet.
 * The system does not currently use a document understanding model or a trained layout-aware extraction model.
 * Optional LLM/API correction is not part of the core deterministic pipeline yet.
 
@@ -481,10 +601,12 @@ Completed:
 8. Item-level evaluation.
 9. Error analysis report.
 10. OCR layout inspection utility.
+11. Optional OCR text correction experiment.
+12. Corrected item-name evaluation.
 
 Planned improvements:
 
-1. Add optional OCR text correction for item names and store names.
+1. Improve optional OCR text correction using a larger correction dictionary or LLM-based correction.
 2. Add layout-aware item parsing using OCR bounding boxes.
 3. Add OpenCV preprocessing experiments.
 4. Compare PaddleOCR with VietOCR.
@@ -501,6 +623,7 @@ Current status:
 
 ```text
 rule_based_v0.3 completed
+optional OCR text correction experiment completed
 ```
 
 Implemented:
@@ -514,6 +637,8 @@ Implemented:
 * payment method detection
 * item-level evaluation
 * OCR layout inspection utility
+* optional OCR text correction
+* corrected item-name evaluation
 * Streamlit UI
 * SQLite storage
 * JSON/CSV export
@@ -529,8 +654,17 @@ item-level overall accuracy    : 87.82%
 items count accuracy           : 100.00%
 ```
 
+OCR text correction experiment:
+
+```text
+raw item name accuracy       : 84.62%
+corrected item name accuracy : 84.62%
+average similarity delta     : +0.0169
+regressed rows               : 0
+```
+
 Next phase:
 
 ```text
-Optional OCR text correction and layout-aware parsing
+Improve OCR text correction and add layout-aware parsing
 ```
