@@ -12,13 +12,13 @@ This experiment does not replace the main `rule_based_v0.3` parser.
 - Total ground-truth items: `39`
 - Total predicted items: `39`
 - Items count accuracy: `100.00%`
-- Overall item field accuracy: `98.72%`
+- Overall item field accuracy: `100.00%`
 
 ## Field Accuracies
 
 | field | accuracy |
 | --- | --- |
-| name_accuracy | 94.87% |
+| name_accuracy | 100.00% |
 | quantity_accuracy | 100.00% |
 | unit_price_accuracy | 100.00% |
 | line_total_accuracy | 100.00% |
@@ -29,10 +29,7 @@ _No rows._
 
 ## Failed Rows
 
-| receipt_id | item_index | gt_name | pred_name | name_score | gt_quantity | pred_quantity | gt_unit_price | pred_unit_price | gt_line_total | pred_line_total | strategy | source_row_id | value_row_id |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| receipt_005 | 3 | Trân châu đường đen | Tran cha | 0.5926 | 1 | 1 | 10000 | 10000 | 10000 | 10000 | single_row | 15 | 15 |
-| receipt_011 | 2 | Bánh Mì Gà Kim Quất (Cay) | Quat(Cay) Banh Mi Ga Kim | 0.6087 | 1 | 1 | 32000 | 32000 | 32000 | 32000 | single_row | 9 | 9 |
+_No rows._
 
 ## Notes
 

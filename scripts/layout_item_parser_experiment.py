@@ -361,6 +361,106 @@ def extract_name_from_row(row: LayoutRow) -> str | None:
     return name
 
 
+def normalize_item_name_order(name: str) -> str:
+    """
+    Fix item-name fragments that OCR/layout order places in the wrong order.
+
+    Example:
+        Quat(Cay) Banh Mi Ga Kim
+        -> Banh Mi Ga Kim Quat(Cay)
+    """
+    text = clean_line(name)
+
+    if not text:
+        return text
+
+    normalized = normalize_layout_matching_text(text)
+
+    if "BANH MI" in normalized and ("QUAT" in normalized or "CAY" in normalized):
+        parts = text.split()
+
+        modifier_parts = []
+        main_parts = []
+
+        for part in parts:
+            part_normalized = normalize_layout_matching_text(part)
+
+            if "QUAT" in part_normalized or "CAY" in part_normalized:
+                modifier_parts.append(part)
+            else:
+                main_parts.append(part)
+
+        if main_parts and modifier_parts:
+            return clean_line(" ".join(main_parts + modifier_parts))
+
+    return text
+
+
+def append_name_continuation_if_needed(
+    item: LayoutItem,
+    section_rows: list[LayoutRow],
+    next_index: int,
+) -> tuple[LayoutItem, int]:
+    """
+    Append short continuation rows to an already parsed item name.
+
+    Example receipt_005:
+        Tran cha | 1 | 10.000 | 10.000
+        duongder
+
+    Expected name:
+        Tran cha duongder
+
+    This is conservative:
+    - only checks the immediate next row
+    - only appends rows with text but no money values
+    - does not append summary/end rows
+    """
+    if next_index >= len(section_rows):
+        item.name = normalize_item_name_order(item.name)
+        return item, next_index
+
+    next_row = section_rows[next_index]
+
+    if is_end_row(next_row):
+        item.name = normalize_item_name_order(item.name)
+        return item, next_index
+
+    if collect_money_values(next_row):
+        item.name = normalize_item_name_order(item.name)
+        return item, next_index
+
+    continuation_name = extract_name_from_row(next_row)
+
+    if not continuation_name:
+        item.name = normalize_item_name_order(item.name)
+        return item, next_index
+
+    # Avoid merging a likely new item name that is followed by a value row.
+    if next_index + 1 < len(section_rows):
+        row_after_next = section_rows[next_index + 1]
+
+        if not is_end_row(row_after_next) and collect_money_values(row_after_next):
+            item.name = normalize_item_name_order(item.name)
+            return item, next_index
+
+    merged_name = clean_line(f"{item.name} {continuation_name}")
+
+    return (
+        LayoutItem(
+            receipt_id=item.receipt_id,
+            name=normalize_item_name_order(merged_name),
+            quantity=item.quantity,
+            unit_price=item.unit_price,
+            line_total=item.line_total,
+            source_row_id=item.source_row_id,
+            value_row_id=item.value_row_id,
+            strategy=f"{item.strategy}+name_continuation",
+        ),
+        next_index + 1,
+    )
+
+
 def collect_money_values(row: LayoutRow) -> list[int]:
     values = []
 
@@ -580,8 +680,14 @@ def parse_layout_items_for_receipt(receipt_id: str) -> list[LayoutItem]:
         single_row_item = parse_single_row_item(row)
 
         if single_row_item is not None:
+            single_row_item, next_index = append_name_continuation_if_needed(
+                single_row_item,
+                section_rows,
+                index + 1,
+            )
+
             items.append(single_row_item)
-            index += 1
+            index = next_index
             continue
 
         # Then try name row + value row.
@@ -596,6 +702,7 @@ def parse_layout_items_for_receipt(receipt_id: str) -> list[LayoutItem]:
                 pair_item = parse_name_value_pair(row, value_row)
 
                 if pair_item is not None:
+                    pair_item.name = normalize_item_name_order(pair_item.name)
                     items.append(pair_item)
                     index = lookahead_index + 1
                     break
