@@ -33,7 +33,7 @@ class ReceiptExtractionResult:
     total_amount: int | None = None
     payment_method: str = "unknown"
     num_ocr_lines: int = 0
-    parser_version: str = "rule_based_v0.2"
+    parser_version: str = "rule_based_v0.3"
     warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:

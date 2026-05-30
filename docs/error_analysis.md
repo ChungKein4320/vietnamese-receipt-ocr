@@ -14,18 +14,18 @@ data/evaluation/evaluation_summary.json
 ## Current Evaluation Summary
 
 - Number of receipts: `15`
-- Overall accuracy: `72.22%`
+- Overall accuracy: `91.11%`
 
 ### Field-level error buckets
 
 | field | accuracy | accuracy_percent | num_errors | num_receipts | error_rate |
 | --- | --- | --- | --- | --- | --- |
 | store_name | 0.8 | 80.00% | 3 | 15 | 0.2 |
-| datetime | 0.8 | 80.00% | 3 | 15 | 0.2 |
-| invoice_id | 0.4 | 40.00% | 9 | 15 | 0.6 |
+| datetime | 0.9333 | 93.33% | 1 | 15 | 0.0667 |
+| invoice_id | 0.8667 | 86.67% | 2 | 15 | 0.1333 |
 | total_amount | 0.9333 | 93.33% | 1 | 15 | 0.0667 |
-| payment_method | 0.7333 | 73.33% | 4 | 15 | 0.2667 |
-| items_count | 0.6667 | 66.67% | 5 | 15 | 0.3333 |
+| payment_method | 1.0 | 100.00% | 0 | 15 | 0.0 |
+| items_count | 0.9333 | 93.33% | 1 | 15 | 0.0667 |
 
 ## Field-level Error Details
 
@@ -41,23 +41,14 @@ data/evaluation/evaluation_summary.json
 
 | receipt_id | ground_truth | prediction | score |
 | --- | --- | --- | --- |
-| receipt_012 | 2020-08-14 08:42 |  | 0.0 |
-| receipt_013 | 2020-08-10 20:01 | 2020-03-10 | 0.0 |
-| receipt_015 | 2020-08-15 09:47 |  | 0.0 |
+| receipt_013 | 2020-08-10 20:01 | 2020-03-10 20:01 | 0.0 |
 
 ### invoice_id
 
 | receipt_id | ground_truth | prediction | score |
 | --- | --- | --- | --- |
-| receipt_002 | SO-32 |  | 0.0 |
-| receipt_003 | BL.200814.1.00046 |  | 0.0 |
-| receipt_005 | 2003000468 |  | 0.0 |
-| receipt_008 | SON55598 |  | 0.0 |
-| receipt_009 | SO-31 |  | 0.0 |
-| receipt_011 | I9810000682020 |  | 0.0 |
-| receipt_012 |  | 0333863328-FAX | 0.0 |
+| receipt_013 | 2003000874 |  | 0.0 |
 | receipt_014 | I00022-550301 |  | 0.0 |
-| receipt_015 |  | 0333363328-FAX | 0.0 |
 
 ### total_amount
 
@@ -67,28 +58,17 @@ data/evaluation/evaluation_summary.json
 
 ### payment_method
 
-| receipt_id | ground_truth | prediction | score |
-| --- | --- | --- | --- |
-| receipt_002 | cash | unknown | 0.0 |
-| receipt_005 | cash | unknown | 0.0 |
-| receipt_009 | cash | unknown | 0.0 |
-| receipt_013 | cash | unknown | 0.0 |
+_No errors detected for this field._
 
 ### items_count
 
 | receipt_id | ground_truth | prediction | score |
 | --- | --- | --- | --- |
-| receipt_006 | 2 | 3 | 0.5 |
-| receipt_007 | 1 | 2 | 0.0 |
-| receipt_008 | 5 | 6 | 0.8 |
-| receipt_012 | 1 | 2 | 0.0 |
-| receipt_015 | 2 | 3 | 0.5 |
+| receipt_004 | 9 | 8 | 0.889 |
 
 ## Parser Warnings
 
-| warning | count |
-| --- | --- |
-| datetime_not_found | 2 |
+_No parser warnings found in the current evaluation report._
 
 ## Observations
 

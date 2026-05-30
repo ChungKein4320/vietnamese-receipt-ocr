@@ -144,6 +144,34 @@ ITEM_REJECT_KEYWORDS = [
 ]
 
 
+def _looks_like_address_metadata(name: str) -> bool:
+    """
+    Detect address/location metadata lines that were accidentally parsed as items.
+    Keep this conservative to avoid removing real product names.
+    """
+    normalized = _normalize_item_name_for_filter(name)
+
+    if not normalized:
+        return False
+
+    address_patterns = [
+        r"\bP\s+[A-Z0-9]+",
+        r"\bQ\s+[A-Z0-9]+",
+        r"\bTP\s+[A-Z0-9]+",
+        r"\bDONG DA\b",
+        r"\bGO VAP\b",
+        r"\bHA NOI\b",
+        r"\bHA NO\b",
+        r"\bHA NI\b",
+        r"\bCAM PHA\b",
+        r"\bPHAM NGOC THACH\b",
+        r"\bHUYNH VAN BANH\b",
+        r"\bTRUNG TU\b",
+    ]
+
+    return any(re.search(pattern, normalized) for pattern in address_patterns)
+
+
 def _has_alpha(text: str) -> bool:
     return bool(re.search(r"[A-Za-zÀ-ỹ]", text))
 
@@ -258,7 +286,6 @@ def _is_invalid_item_name(line: str) -> bool:
         "NGAY",
         "DATE",
         "TIME",
-        "GIO",
         "THOI GIAN",
         "VI TRI",
     ]
@@ -1376,7 +1403,6 @@ def _is_item_name_candidate(line: str) -> bool:
 
     return True
 
-
 def _parse_item_from_single_line(line: str) -> ReceiptItem | None:
     """
     Parse item if OCR kept name, quantity, unit price, and total in one line.
@@ -1437,26 +1463,332 @@ def filter_invalid_items(items: list[ReceiptItem]) -> list[ReceiptItem]:
     return filtered_items
 
 
+def _get_item_field(item, field_name: str):
+    """
+    Safely get a field from either a dataclass-like item or a dict item.
+    """
+    if isinstance(item, dict):
+        return item.get(field_name)
+
+    return getattr(item, field_name, None)
+
+
+def _is_empty_value(value) -> bool:
+    return value is None or str(value).strip() == ""
+
+
+def _is_year_like_number(value) -> bool:
+    """
+    Detect values like 2019/2020 being accidentally parsed as prices.
+    """
+    if value is None:
+        return False
+
+    try:
+        number = int(float(value))
+    except (TypeError, ValueError):
+        return False
+
+    return 1900 <= number <= 2100
+
+
+def _normalize_item_name_for_filter(name: str) -> str:
+    normalized = normalize_for_matching(name)
+    normalized = re.sub(r"[^A-Z0-9]+", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
+def _is_non_item_name(name: str) -> bool:
+    """
+    Detect OCR lines that should not be treated as receipt items.
+
+    Conservative rule:
+    - Remove obvious metadata/summary/noise lines.
+    - Do NOT remove broad address-like words such as TP, TINH, XA, THON,
+      because OCR product names can contain similar tokens.
+    """
+    if not name:
+        return True
+
+    normalized = _normalize_item_name_for_filter(name)
+
+    if not normalized:
+        return True
+
+    # Very short OCR fragments such as "Od", "0d", "C".
+    if normalized in {"OD", "0D", "O D", "C", "O", "D"}:
+        return True
+
+    # Receipt metadata / document labels.
+    metadata_keywords = [
+        "HOA DON",
+        "PHIEU",
+        "SO HOA DON",
+        "SO CHUNG TU",
+        "SOCHUNG TU",
+        "SOCHUNGTU",
+        "SOHD",
+        "SHD",
+        "NHAN VIEN",
+        "THU NGAN",
+        "NHAN VIEN THU NGAN",
+        "CAISSIER",
+        "CASHIER",
+        "QUAY",
+        "MAY POS",
+        "VI TRI",
+        "AN TAI CHO",
+        "MANGVE",
+        "MANG VE",
+        "KHACH HANG",
+        "KHACH LE",
+        "PASS WIFI",
+        "WIFI",
+        "HOTLINE",
+        "TEL",
+        "FAX",
+        "DIEN THOAI",
+        "PHONE",
+        "CAM ON",
+        "XIN CAM ON",
+        "THANK YOU",
+        "SAMSUNG",
+        "TRIPLE CAMERA",
+        "GALAXY",
+        "CHUP BANG",
+    ]
+
+    if any(keyword in normalized for keyword in metadata_keywords):
+        return True
+
+    # Totals / discounts / payment summary lines.
+    summary_keywords = [
+        "TONG",
+        "T8NG",
+        "CONG",
+        "TONG CONG",
+        "TONG TIEN",
+        "TONG THANH TOAN",
+        "THANH TOAN",
+        "TONG SO",
+        "TONG SL",
+        "TONG SO LUONG",
+        "TIEN THANH TOAN",
+        "TIEN KHACH TRA",
+        "KHACH TRA",
+        "KHACH DUA",
+        "TIEN THUA",
+        "TRA KHACH",
+        "TRA LAI",
+        "CHIET KHAU",
+        "GIAM GIA",
+        "VAT",
+        "PHI",
+        "SERVICE",
+    ]
+
+    if any(keyword in normalized for keyword in summary_keywords):
+        return True
+
+    # Store names only when the line is clearly a store header.
+    store_header_keywords = [
+        "CUA HANG",
+        "NHA SACH",
+        "SIEU THI",
+        "VINCOMMERCE",
+    ]
+
+    if any(keyword in normalized for keyword in store_header_keywords):
+        return True
+
+    # Lines containing explicit year/date are usually metadata, not item names.
+    if re.search(r"\b20\d{2}\b", normalized):
+        return True
+
+    return False
+
+
+def _should_keep_item_candidate(item) -> bool:
+    """
+    Decide whether a parsed item candidate is likely to be a real receipt item.
+    """
+    name = _get_item_field(item, "name")
+    quantity = _get_item_field(item, "quantity")
+    unit_price = _get_item_field(item, "unit_price")
+    line_total = _get_item_field(item, "line_total")
+
+    name_text = str(name or "")
+
+    if _is_non_item_name(name_text):
+        return False
+
+    # Address line false positive:
+    # Example receipt_007:
+    #   P Trung TuQ Dong DaTP Ha No | unit_price=2020 | line_total=9017432
+    if _looks_like_address_metadata(name_text):
+        return False
+
+    # Strong false-positive pattern:
+    # metadata line + year parsed as unit_price.
+    if _is_year_like_number(unit_price) and _is_empty_value(quantity):
+        return False
+
+    # Another weak candidate: no quantity and no line total.
+    # Real receipt items usually have at least quantity or line total.
+    if _is_empty_value(quantity) and _is_empty_value(line_total):
+        return False
+
+    return True
+
+
+def _filter_item_candidates(items: list) -> list:
+    """
+    Remove non-item candidates after the parser creates item objects.
+    """
+    return [item for item in items if _should_keep_item_candidate(item)]
+
+
+def _parse_reversed_temp_bill_items(section_lines: list[str]) -> list[ReceiptItem]:
+    """
+    Parse temporary-bill layouts where OCR order is reversed or column-like.
+
+    Example receipt_009 OCR:
+        35000
+        35000
+        1,00
+        1 APPLE TEAICE
+        35000
+
+    Expected item:
+        name=APPLE TEAICE
+        quantity=1
+        unit_price=35000
+        line_total=35000
+    """
+    items: list[ReceiptItem] = []
+
+    for index, raw_line in enumerate(section_lines):
+        line = clean_line(raw_line)
+
+        if not line:
+            continue
+
+        # Match item lines such as:
+        #   1 APPLE TEAICE
+        #   1 COCONUT
+        match = re.match(r"^(?P<quantity>\d+(?:[,.]\d+)?)\s+(?P<name>[A-Za-zÀ-ỹ].+)$", line)
+
+        if not match:
+            continue
+
+        name = clean_line(match.group("name"))
+        quantity = parse_quantity(match.group("quantity"))
+
+        if _is_non_item_name(name):
+            continue
+
+        # Look backward for prices.
+        previous_lines = section_lines[max(0, index - 5):index]
+        previous_money_values: list[int] = []
+
+        for previous_line in previous_lines:
+            previous_money_values.extend(find_money_values(previous_line))
+
+        # Look forward as fallback.
+        next_lines = section_lines[index + 1:min(index + 4, len(section_lines))]
+        next_money_values: list[int] = []
+
+        for next_line in next_lines:
+            next_money_values.extend(find_money_values(next_line))
+
+        money_values = previous_money_values or next_money_values
+
+        if not money_values:
+            continue
+
+        unit_price = money_values[0]
+        line_total = money_values[-1]
+
+        items.append(
+            ReceiptItem(
+                name=name,
+                quantity=quantity,
+                unit_price=unit_price,
+                line_total=line_total,
+            )
+        )
+
+    return _filter_item_candidates(filter_invalid_items(items))
+
+
+def _finalize_item_candidates(items: list[ReceiptItem]) -> list[ReceiptItem]:
+    """
+    Apply existing invalid-item filtering and the newer metadata/noise filter.
+    """
+    return _filter_item_candidates(filter_invalid_items(items))
+
+
+def _score_item_candidate_list(items: list[ReceiptItem]) -> tuple[int, int]:
+    """
+    Score candidate item lists.
+
+    Priority:
+        1. More valid items.
+        2. More complete item fields.
+    """
+    completeness_score = 0
+
+    for item in items:
+        if not _is_empty_value(_get_item_field(item, "quantity")):
+            completeness_score += 1
+
+        if not _is_empty_value(_get_item_field(item, "unit_price")):
+            completeness_score += 1
+
+        if not _is_empty_value(_get_item_field(item, "line_total")):
+            completeness_score += 1
+
+    return len(items), completeness_score
+
+
 def extract_items(lines: list[str]) -> list[ReceiptItem]:
     """
-    Baseline item extraction.
+    Item extraction.
 
     Strategy:
-        1. Try parsing single-line item rows.
-        2. Try parsing split OCR rows:
+        1. Try parsing reversed temporary-bill item rows.
+        2. Try parsing single-line item rows.
+        3. Try parsing split OCR rows:
            item_name -> barcode(optional) -> unit_price -> quantity -> line_total
+        4. Choose the best filtered candidate list.
     """
     section_lines = _find_item_section(lines)
-    items = []
+
+    candidate_lists: list[list[ReceiptItem]] = []
+
+    # Candidate 1: reversed temporary bill layout.
+    reversed_items = _parse_reversed_temp_bill_items(section_lines)
+
+    if reversed_items:
+        candidate_lists.append(reversed_items)
+
+    # Candidate 2: single-line item parser.
+    single_line_items = []
 
     for line in section_lines:
         item = _parse_item_from_single_line(line)
+
         if item is not None:
-            items.append(item)
+            single_line_items.append(item)
 
-    if items:
-        return filter_invalid_items(items)
+    finalized_single_line_items = _finalize_item_candidates(single_line_items)
 
+    if finalized_single_line_items:
+        candidate_lists.append(finalized_single_line_items)
+
+    # Candidate 3: split OCR row parser.
+    split_items = []
     index = 0
 
     while index < len(section_lines):
@@ -1501,7 +1833,7 @@ def extract_items(lines: list[str]) -> list[ReceiptItem]:
                 continue
 
         if unit_price is not None or line_total is not None:
-            items.append(
+            split_items.append(
                 ReceiptItem(
                     name=name,
                     quantity=quantity,
@@ -1515,7 +1847,15 @@ def extract_items(lines: list[str]) -> list[ReceiptItem]:
 
         index += 1
 
-    return filter_invalid_items(items)
+    finalized_split_items = _finalize_item_candidates(split_items)
+
+    if finalized_split_items:
+        candidate_lists.append(finalized_split_items)
+
+    if not candidate_lists:
+        return []
+
+    return max(candidate_lists, key=_score_item_candidate_list)
 
 
 def parse_receipt_text(
