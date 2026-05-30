@@ -1383,25 +1383,68 @@ def _find_item_section(lines: list[str]) -> list[str]:
     return lines[start_index:end_index]
 
 
+def _is_known_product_code_line(line: str) -> bool:
+    """
+    Detect product-name lines with known product prefixes.
+
+    Example:
+        CP_sudn gia heo 300g
+        CP_sudn non heo 300g
+        CP_Thit ba rQi co da 300g
+    """
+    text = clean_line(line)
+
+    if not text:
+        return False
+
+    normalized = normalize_for_matching(text)
+    normalized = re.sub(r"[^A-Z0-9_]+", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    return bool(re.match(r"^CP[_\s-]", normalized))
+
+
 def _is_item_name_candidate(line: str) -> bool:
-    normalized = _normalize_item_matching_text(line)
+    """
+    Decide whether an OCR line can be treated as an item-name line.
+
+    Important:
+    Product names can contain words that look like table headers, for example:
+        CP_sudn gia heo 300g
+
+    Therefore, known product-code prefixes are whitelisted before broad
+    metadata/header filtering.
+    """
+    text = clean_line(line)
+
+    if not text:
+        return False
+
+    normalized = _normalize_item_matching_text(text)
 
     if len(normalized) < 2:
         return False
 
-    if not _has_alpha(line):
+    if not _has_alpha(text):
         return False
 
-    if _is_invalid_item_name(line):
+    # Whitelist known product-code lines before broad header/metadata filtering.
+    # This prevents product names such as "CP_sudn gia heo 300g" from being
+    # rejected because they contain words like "gia".
+    if _is_known_product_code_line(text):
+        return True
+
+    if _is_invalid_item_name(text):
         return False
 
     if any(keyword in normalized for keyword in ITEM_SECTION_END_KEYWORDS):
         return False
 
-    if find_money_values(line):
+    if find_money_values(text):
         return False
 
     return True
+
 
 def _parse_item_from_single_line(line: str) -> ReceiptItem | None:
     """
@@ -1451,7 +1494,7 @@ def filter_invalid_items(items: list[ReceiptItem]) -> list[ReceiptItem]:
     for item in items:
         name = clean_line(item.name)
 
-        if _is_invalid_item_name(name):
+        if _is_invalid_item_name(name) and not _is_known_product_code_line(name):
             continue
 
         # A valid item should usually have at least one price-related value.

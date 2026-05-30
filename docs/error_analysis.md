@@ -14,7 +14,7 @@ data/evaluation/evaluation_summary.json
 ## Current Evaluation Summary
 
 - Number of receipts: `15`
-- Overall accuracy: `91.11%`
+- Overall accuracy: `92.22%`
 
 ### Field-level error buckets
 
@@ -25,7 +25,7 @@ data/evaluation/evaluation_summary.json
 | invoice_id | 0.8667 | 86.67% | 2 | 15 | 0.1333 |
 | total_amount | 0.9333 | 93.33% | 1 | 15 | 0.0667 |
 | payment_method | 1.0 | 100.00% | 0 | 15 | 0.0 |
-| items_count | 0.9333 | 93.33% | 1 | 15 | 0.0667 |
+| items_count | 1.0 | 100.00% | 0 | 15 | 0.0 |
 
 ## Field-level Error Details
 
@@ -62,9 +62,7 @@ _No errors detected for this field._
 
 ### items_count
 
-| receipt_id | ground_truth | prediction | score |
-| --- | --- | --- | --- |
-| receipt_004 | 9 | 8 | 0.889 |
+_No errors detected for this field._
 
 ## Parser Warnings
 

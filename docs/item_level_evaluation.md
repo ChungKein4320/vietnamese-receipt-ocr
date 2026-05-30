@@ -10,24 +10,22 @@ This report compares each ground-truth item with the predicted item at the same 
 
 - Number of receipts: `15`
 - Total ground-truth items: `39`
-- Total predicted items: `38`
-- Items count accuracy: `93.33%`
-- Overall item field accuracy: `78.21%`
+- Total predicted items: `39`
+- Items count accuracy: `100.00%`
+- Overall item field accuracy: `87.82%`
 
 ## Field Accuracies
 
 | field | accuracy |
 | --- | --- |
-| name_accuracy | 74.36% |
-| quantity_accuracy | 71.79% |
-| unit_price_accuracy | 84.62% |
-| line_total_accuracy | 82.05% |
+| name_accuracy | 84.62% |
+| quantity_accuracy | 74.36% |
+| unit_price_accuracy | 97.44% |
+| line_total_accuracy | 94.87% |
 
 ## Receipts with Item Count Errors
 
-| receipt_id | gt_items_count | pred_items_count | items_count_ok |
-| --- | --- | --- | --- |
-| receipt_004 | 9 | 8 | 0 |
+_No rows._
 
 ## Failed Item Rows
 
@@ -38,11 +36,6 @@ This report compares each ground-truth item with the predicted item at the same 
 | receipt_003 | 3 | Thịt Thăn Heo Xông Khói Lifefood 200g | 1Goi | 0.1463 | 1 | 0 | 0 | 52000 | 52000 | 1 | 52000 | 52000 | 1 |
 | receipt_004 | 1 | CLEAR Dầu gội thảo dược 630g | CLEAR Dau goi thao dugc 630g | 0.9643 | 1 |  | 0 | 178000 | 178000 | 1 | 178000 | 178000 | 1 |
 | receipt_004 | 2 | GERVENNE ST trắng n.hoa tc Sữa dê 900g | GERVENNE sT trang n.hoa tc sua de 900g | 1.0 | 1 |  | 0 | 108000 | 108000 | 1 | 108000 | 108000 | 1 |
-| receipt_004 | 5 | CP_Sườn già heo 300g | CP_sudn non heo 300g | 0.8 | 1 | 1 | 1 | 39900 | 74500 | 0 | 39900 | 74500 | 0 |
-| receipt_004 | 6 | CP_Sườn non heo 300g | CP_Thit ba rQi co da 300g | 0.4444 | 1 | 1 | 1 | 74500 | 66500 | 0 | 74500 | 66500 | 0 |
-| receipt_004 | 7 | CP_Thịt ba rọi có da 300g | CP_Mong heo 500g | 0.439 | 1 | 1 | 1 | 66500 | 54500 | 0 | 66500 | 54500 | 0 |
-| receipt_004 | 8 | CP_Móng heo 500g | CP_Bap gio heo khong xudng 300g | 0.5106 | 1 | 1 | 1 | 54500 | 51500 | 0 | 54500 | 51500 | 0 |
-| receipt_004 | 9 | CP_Bắp giò heo không xương 300g |  | 0.0 | 1 |  | 0 | 51500 |  | 0 | 51500 |  | 0 |
 | receipt_005 | 2 | Sữa chua matcha | Sua chua | 0.6957 | 1 | 2 | 0 | 25000 | 25000 | 1 | 25000 | 25000 | 1 |
 | receipt_005 | 3 | Trân châu đường đen | Tran cha | 0.5926 | 1 | 1 | 1 | 10000 | 10000 | 1 | 10000 | 10000 | 1 |
 | receipt_008 | 2 | Sữa tươi TT Dalat milk ít đường 180ml | Sua tuoi TT Dalat milk it duong I80ml | 0.973 | 4 | 4 | 1 | 6750 | 27000 | 0 | 27000 |  | 0 |
