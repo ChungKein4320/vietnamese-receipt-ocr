@@ -289,6 +289,15 @@ def is_noise_name(text: str) -> bool:
 
     if normalized_clean in exact_headers:
         return True
+    
+    # OCR fragments / non-product standalone tokens.
+    standalone_noise_tokens = {
+        "JENB",
+        "DIA",
+    }
+
+    if normalized_clean in standalone_noise_tokens:
+        return True
 
     return False
 
@@ -362,10 +371,34 @@ def collect_money_values(row: LayoutRow) -> list[int]:
 
 
 def collect_quantity_values(row: LayoutRow) -> list[float]:
-    quantities = []
+    """
+    Collect quantity values from a layout row.
 
-    for text in row.texts:
+    Handles cases such as:
+        1Goi | 9,000 | 0 | 9,000
+        2 | Sua chua | matcha | 1 | 25.000 | 25.000
+
+    Rules:
+    - Ignore money values and barcodes.
+    - Ignore zero values, because they are often KM/discount columns.
+    - If the first cell is a numeric-only STT/index and the row also contains
+      item-name text, skip that first numeric cell.
+    - Support compact quantity-unit OCR text such as `1Goi`.
+    """
+    quantities: list[float] = []
+
+    has_name_text = any(
+        has_alpha(text)
+        and not find_money_values(text)
+        and not is_probable_barcode(text)
+        for text in row.texts
+    )
+
+    for cell_index, text in enumerate(row.texts):
         cleaned = clean_line(text)
+
+        if not cleaned:
+            continue
 
         if is_probable_barcode(cleaned):
             continue
@@ -373,9 +406,34 @@ def collect_quantity_values(row: LayoutRow) -> list[float]:
         if find_money_values(cleaned):
             continue
 
+        # Skip leading row index/STT in rows like:
+        #   2 | Sua chua | matcha | 1 | 25.000 | 25.000
+        if (
+            cell_index == 0
+            and has_name_text
+            and re.fullmatch(r"\d+", cleaned)
+            and len(row.texts) >= 5
+        ):
+            continue
+
+        # Support compact quantity-unit cells such as:
+        #   1Goi
+        compact_quantity_match = re.match(
+            r"^(?P<quantity>\d+(?:[,.]\d+)?)\s*[A-Za-zÀ-ỹ]+$",
+            cleaned,
+        )
+
+        if compact_quantity_match:
+            quantity = parse_quantity(compact_quantity_match.group("quantity"))
+
+            if quantity is not None and quantity > 0:
+                quantities.append(quantity)
+
+            continue
+
         quantity = parse_quantity(cleaned)
 
-        if quantity is not None:
+        if quantity is not None and quantity > 0:
             quantities.append(quantity)
 
     return quantities
@@ -399,6 +457,57 @@ def parse_values_from_row(row: LayoutRow) -> tuple[float | None, int | None, int
     return quantity, unit_price, line_total
 
 
+def normalize_layout_item_values(item: LayoutItem) -> LayoutItem:
+    """
+    Fix common layout parser value issues.
+
+    Examples:
+    - If unit_price == line_total and quantity is missing, infer quantity = 1.
+    - If quantity > 1 and only line_total was detected, infer unit_price = line_total / quantity.
+    - If OCR produced tiny line_total such as 6 from `0006`, but unit_price is
+      plausible, fall back line_total to unit_price.
+    """
+    quantity = item.quantity
+    unit_price = item.unit_price
+    line_total = item.line_total
+
+    if unit_price is not None and line_total is not None:
+        if line_total < 1000 and unit_price >= 1000:
+            line_total = unit_price
+
+        # Case:
+        #   quantity = 4
+        #   unit_price = 27000
+        #   line_total = 27000
+        #
+        # This often means OCR only preserved the line total.
+        # Infer unit price from total / quantity.
+        if (
+            quantity is not None
+            and quantity > 1
+            and unit_price == line_total
+            and line_total % quantity == 0
+        ):
+            inferred_unit_price = int(line_total / quantity)
+
+            if inferred_unit_price >= 1000:
+                unit_price = inferred_unit_price
+
+        elif unit_price == line_total:
+            quantity = 1
+
+    return LayoutItem(
+        receipt_id=item.receipt_id,
+        name=item.name,
+        quantity=quantity,
+        unit_price=unit_price,
+        line_total=line_total,
+        source_row_id=item.source_row_id,
+        value_row_id=item.value_row_id,
+        strategy=item.strategy,
+    )
+
+
 def parse_single_row_item(row: LayoutRow) -> LayoutItem | None:
     name = extract_name_from_row(row)
 
@@ -410,15 +519,17 @@ def parse_single_row_item(row: LayoutRow) -> LayoutItem | None:
     if unit_price is None and line_total is None:
         return None
 
-    return LayoutItem(
-        receipt_id=row.receipt_id,
-        name=name,
-        quantity=quantity,
-        unit_price=unit_price,
-        line_total=line_total,
-        source_row_id=row.row_id,
-        value_row_id=row.row_id,
-        strategy="single_row",
+    return normalize_layout_item_values(
+        LayoutItem(
+            receipt_id=row.receipt_id,
+            name=name,
+            quantity=quantity,
+            unit_price=unit_price,
+            line_total=line_total,
+            source_row_id=row.row_id,
+            value_row_id=row.row_id,
+            strategy="single_row",
+        )
     )
 
 
@@ -436,15 +547,17 @@ def parse_name_value_pair(
     if unit_price is None and line_total is None:
         return None
 
-    return LayoutItem(
-        receipt_id=name_row.receipt_id,
-        name=name,
-        quantity=quantity,
-        unit_price=unit_price,
-        line_total=line_total,
-        source_row_id=name_row.row_id,
-        value_row_id=value_row.row_id,
-        strategy="name_value_pair",
+    return normalize_layout_item_values(
+        LayoutItem(
+            receipt_id=name_row.receipt_id,
+            name=name,
+            quantity=quantity,
+            unit_price=unit_price,
+            line_total=line_total,
+            source_row_id=name_row.row_id,
+            value_row_id=value_row.row_id,
+            strategy="name_value_pair",
+        )
     )
 
 
