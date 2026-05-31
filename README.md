@@ -41,6 +41,7 @@ The system takes a receipt image as input, runs OCR, extracts structured receipt
 * Evaluate extraction quality against manually created ground truth labels.
 * Inspect OCR bounding boxes for layout-level debugging.
 * Optionally apply OCR text correction to store names and item names.
+* Run a layout-aware item parser candidate using OCR bounding-box rows.
 
 ## Extracted Fields
 
@@ -64,6 +65,7 @@ The current parser extracts:
 | OCR                    | PaddleOCR                                      |
 | Image handling         | Pillow, OpenCV                                 |
 | Information extraction | Regex + rule-based parser                      |
+| Layout-aware parsing   | OCR bounding-box row grouping                  |
 | Text correction        | Rule-based OCR text correction                 |
 | UI                     | Streamlit                                      |
 | Database               | SQLite                                         |
@@ -87,6 +89,7 @@ vietnamese-receipt-ocr/
 │   ├── ocr_outputs/
 │   ├── extracted_results/
 │   ├── corrected_results/
+│   ├── layout_extracted_results/
 │   ├── ground_truth/
 │   ├── evaluation/
 │   └── sample/
@@ -99,6 +102,8 @@ vietnamese-receipt-ocr/
 │   ├── dataset_strategy.md
 │   ├── error_analysis.md
 │   ├── item_level_evaluation.md
+│   ├── layout_aware_item_evaluation.md
+│   ├── layout_item_parser_experiment.md
 │   └── mvp_scope.md
 │
 ├── notebooks/
@@ -111,6 +116,7 @@ vietnamese-receipt-ocr/
 │   ├── evaluator.py
 │   ├── exporter.py
 │   ├── image_preprocessor.py
+│   ├── layout_item_parser.py
 │   ├── ocr_engine.py
 │   ├── ocr_text_corrector.py
 │   ├── receipt_parser.py
@@ -120,16 +126,21 @@ vietnamese-receipt-ocr/
 ├── scripts/
 │   ├── analyze_errors.py
 │   ├── apply_text_correction.py
+│   ├── batch_inspect_ocr_layout.py
 │   ├── evaluate_corrected_items.py
 │   ├── evaluate_extraction.py
 │   ├── evaluate_items.py
+│   ├── evaluate_layout_items.py
 │   ├── export_db.py
 │   ├── init_db.py
 │   ├── inspect_error_context.py
 │   ├── inspect_ocr_layout.py
+│   ├── layout_item_parser_experiment.py
 │   ├── load_extractions_to_db.py
 │   ├── run_extraction.py
-│   └── run_ocr.py
+│   ├── run_layout_item_extraction.py
+│   ├── run_ocr.py
+│   └── summarize_layout_rows.py
 │
 ├── tests/
 │   ├── test_receipt_parser.py
@@ -143,10 +154,12 @@ vietnamese-receipt-ocr/
 
 ## Pipeline
 
+Default deterministic pipeline:
+
 ```text
 Receipt image
 → PaddleOCR
-→ Raw OCR text + OCR bounding boxes
+→ Raw OCR text
 → Text normalization
 → Rule-based information extraction
 → Structured JSON
@@ -156,13 +169,24 @@ Receipt image
 → Item-level evaluation
 ```
 
-Optional post-processing pipeline:
+Optional OCR text correction pipeline:
 
 ```text
 Extracted JSON
 → Rule-based OCR text correction
 → Corrected JSON
 → Corrected item-name evaluation
+```
+
+Layout-aware item parser candidate pipeline:
+
+```text
+OCR JSON with bounding boxes
+→ Layout row grouping
+→ Item section detection
+→ Layout-aware item parsing
+→ Layout-aware extracted JSON
+→ Layout-aware item evaluation
 ```
 
 ## Installation
@@ -292,7 +316,7 @@ docs/error_analysis.md
 data/evaluation/error_buckets.csv
 ```
 
-### 11. Inspect OCR layout boxes
+### 11. Inspect OCR layout boxes for one receipt
 
 ```powershell
 python scripts/inspect_ocr_layout.py --receipt-id receipt_004
@@ -305,7 +329,69 @@ data/evaluation/layout_debug/receipt_004_layout_lines.csv
 data/evaluation/layout_debug/receipt_004_layout_annotated.png
 ```
 
-### 12. Apply optional OCR text correction
+### 12. Inspect OCR layout boxes for all receipts
+
+```powershell
+python scripts/batch_inspect_ocr_layout.py
+```
+
+Output:
+
+```text
+data/evaluation/layout_debug/receipt_001_layout_lines.csv
+data/evaluation/layout_debug/receipt_001_layout_annotated.png
+...
+```
+
+### 13. Summarize grouped layout rows
+
+```powershell
+python scripts/summarize_layout_rows.py
+```
+
+Output:
+
+```text
+data/evaluation/layout_debug/layout_row_summary.txt
+```
+
+### 14. Run layout-aware item extraction
+
+Before running layout-aware item extraction, generate layout debug rows first:
+
+```powershell
+python scripts/batch_inspect_ocr_layout.py
+```
+
+Then run:
+
+```powershell
+python scripts/run_layout_item_extraction.py --all
+```
+
+Output:
+
+```text
+data/layout_extracted_results/receipt_001_layout_extracted.json
+data/layout_extracted_results/receipt_002_layout_extracted.json
+...
+```
+
+### 15. Evaluate layout-aware item extraction
+
+```powershell
+python scripts/evaluate_layout_items.py
+```
+
+Output:
+
+```text
+data/evaluation/layout_aware_item_evaluation_report.csv
+data/evaluation/layout_aware_item_evaluation_summary.json
+docs/layout_aware_item_evaluation.md
+```
+
+### 16. Apply optional OCR text correction
 
 ```powershell
 python scripts/apply_text_correction.py --all
@@ -319,7 +405,7 @@ data/corrected_results/receipt_002_corrected.json
 ...
 ```
 
-### 13. Evaluate corrected item names
+### 17. Evaluate corrected item names
 
 ```powershell
 python scripts/evaluate_corrected_items.py
@@ -333,7 +419,7 @@ data/evaluation/corrected_item_evaluation_summary.json
 docs/corrected_item_evaluation.md
 ```
 
-### 14. Run Streamlit app
+### 18. Run Streamlit app
 
 ```powershell
 streamlit run app/streamlit_app.py
@@ -370,13 +456,21 @@ The current evaluation set contains:
 * 39 ground-truth item rows
 * multiple receipt layouts, including retail, coffee shop, bookstore, restaurant, and small shop receipts
 
-Current parser version:
+Current default parser version:
 
 ```text
 rule_based_v0.3
 ```
 
+Current layout-aware item parser candidate:
+
+```text
+layout_aware_item_v0.4_candidate
+```
+
 ### Receipt-level Evaluation
+
+Receipt-level fields are evaluated using the default rule-based parser.
 
 | Field          | Accuracy |
 | -------------- | -------: |
@@ -388,7 +482,9 @@ rule_based_v0.3
 | Items count    |  100.00% |
 | Overall        |   92.22% |
 
-### Item-level Evaluation
+### Default Item-level Evaluation
+
+Default item extraction uses the text-based `rule_based_v0.3` parser.
 
 | Item Field                  | Accuracy |
 | --------------------------- | -------: |
@@ -399,9 +495,39 @@ rule_based_v0.3
 | Line total                  |   94.87% |
 | Overall item field accuracy |   87.82% |
 
+### Layout-aware Item Evaluation
+
+Layout-aware item extraction uses `layout_aware_item_v0.4_candidate`.
+
+| Item Field                  | Accuracy |
+| --------------------------- | -------: |
+| Item count                  |  100.00% |
+| Item name                   |  100.00% |
+| Quantity                    |  100.00% |
+| Unit price                  |  100.00% |
+| Line total                  |  100.00% |
+| Overall item field accuracy |  100.00% |
+
+This result is measured on the current MVP evaluation set of 15 receipts and 39 item rows. It should be interpreted as a strong candidate result, not as production-level generalization.
+
+### Parser Comparison
+
+| Parser                             | Scope                              | Item Count | Item Name | Quantity | Unit Price | Line Total | Overall Item Field |
+| ---------------------------------- | ---------------------------------- | ---------: | --------: | -------: | ---------: | ---------: | -----------------: |
+| `rule_based_v0.3`                  | Default text-based parser          |    100.00% |    84.62% |   74.36% |     97.44% |     94.87% |             87.82% |
+| `layout_aware_item_v0.4_candidate` | Layout-aware item parser candidate |    100.00% |   100.00% |  100.00% |    100.00% |    100.00% |            100.00% |
+
+The default parser remains `rule_based_v0.3`.
+
+The layout-aware parser is currently evaluated separately and writes output to:
+
+```text
+data/layout_extracted_results/
+```
+
 ### Evaluation Artifacts
 
-The project includes two core evaluation layers.
+The project includes multiple evaluation layers.
 
 ```text
 scripts/evaluate_extraction.py
@@ -413,7 +539,19 @@ Evaluates receipt-level fields such as store name, datetime, invoice ID, total a
 scripts/evaluate_items.py
 ```
 
-Evaluates item-level fields such as item name, quantity, unit price, and line total.
+Evaluates item-level fields from the default extraction output.
+
+```text
+scripts/evaluate_layout_items.py
+```
+
+Evaluates item-level fields from the layout-aware extraction output.
+
+```text
+scripts/evaluate_corrected_items.py
+```
+
+Evaluates raw item names versus corrected item names.
 
 Generated local reports:
 
@@ -422,6 +560,10 @@ data/evaluation/evaluation_report.csv
 data/evaluation/evaluation_summary.json
 data/evaluation/item_evaluation_report.csv
 data/evaluation/item_evaluation_summary.json
+data/evaluation/layout_aware_item_evaluation_report.csv
+data/evaluation/layout_aware_item_evaluation_summary.json
+data/evaluation/corrected_item_evaluation_report.csv
+data/evaluation/corrected_item_evaluation_summary.json
 ```
 
 These files are treated as local evaluation outputs and are not committed to Git.
@@ -440,7 +582,7 @@ The largest improvements came from:
 * OCR layout inspection to debug item extraction failures
 * a targeted whitelist for product-code item names such as `CP_sudn gia heo 300g`
 
-The strongest fields are now:
+The strongest fields in the default rule-based parser are:
 
 ```text
 payment_method : 100.00%
@@ -449,7 +591,7 @@ unit_price     : 97.44%
 line_total     : 94.87%
 ```
 
-Remaining weaker fields:
+Remaining weaker fields in the default rule-based parser:
 
 ```text
 store_name     : 80.00%
@@ -458,7 +600,9 @@ quantity       : 74.36%
 item_name      : 84.62%
 ```
 
-The remaining errors are mostly caused by OCR recognition mistakes, spelling distortion, missing quantity values, and layout variation.
+The layout-aware item parser candidate improves item extraction by using OCR bounding-box row structure. On the current MVP dataset, it reaches 100.00% item-level accuracy across item count, name, quantity, unit price, and line total.
+
+The remaining receipt-level errors are mostly caused by OCR recognition mistakes, spelling distortion, missing quantity values, and layout variation.
 
 ## OCR Error Pattern
 
@@ -548,7 +692,88 @@ On the current 39 item rows:
 
 The correction layer does not improve item-name accuracy yet, but it improves average text similarity and readability without causing regression on the current evaluation set.
 
-This confirms that OCR text correction is useful as an optional post-processing layer, but the remaining item-name errors are mostly caused by parser alignment issues rather than spelling mistakes alone.
+This confirms that OCR text correction is useful as an optional post-processing layer, but the remaining item-name errors in the default parser are mostly caused by parser alignment issues rather than spelling mistakes alone.
+
+## Layout-aware Item Parser Candidate
+
+This project includes a layout-aware item parser candidate.
+
+The layout-aware parser uses OCR bounding-box rows generated from PaddleOCR output. It is designed to improve item extraction by using visual row structure instead of relying only on raw OCR text order.
+
+Current layout-aware parser version:
+
+```text
+layout_aware_item_v0.4_candidate
+```
+
+### Layout-aware Pipeline
+
+```text
+OCR JSON with bounding boxes
+→ Layout row grouping
+→ Item section detection
+→ Layout-aware item parsing
+→ Layout-aware extracted JSON
+→ Layout-aware item evaluation
+```
+
+The layout-aware output is saved separately under:
+
+```text
+data/layout_extracted_results/
+```
+
+The default extraction output under `data/extracted_results/` is not overwritten.
+
+### Layout-aware Scripts
+
+```text
+scripts/inspect_ocr_layout.py
+```
+
+Inspects OCR bounding boxes for a single receipt and generates row-level layout CSV/debug images.
+
+```text
+scripts/batch_inspect_ocr_layout.py
+```
+
+Runs layout inspection for all OCR JSON files.
+
+```text
+scripts/summarize_layout_rows.py
+```
+
+Creates a text summary of grouped OCR layout rows.
+
+```text
+scripts/run_layout_item_extraction.py
+```
+
+Creates layout-aware extraction JSON files by replacing item rows with layout-aware item parser output.
+
+```text
+scripts/evaluate_layout_items.py
+```
+
+Evaluates layout-aware item extraction results against ground truth.
+
+### Current Layout-aware Result
+
+On the current MVP evaluation set:
+
+* 15 receipts
+* 39 ground-truth item rows
+
+| Item Field                  | Accuracy |
+| --------------------------- | -------: |
+| Item count                  |  100.00% |
+| Item name                   |  100.00% |
+| Quantity                    |  100.00% |
+| Unit price                  |  100.00% |
+| Line total                  |  100.00% |
+| Overall item field accuracy |  100.00% |
+
+This result shows that the layout-aware parser is a strong candidate for the next parser version. However, it is still treated as a candidate because it has only been validated on the current MVP dataset, not on a larger production-scale benchmark.
 
 ## Data Privacy and Git Tracking
 
@@ -562,6 +787,7 @@ data/processed/images/*
 data/ocr_outputs/*
 data/extracted_results/*
 data/corrected_results/*
+data/layout_extracted_results/*
 data/ground_truth/*
 data/evaluation/*
 data/dataset_manifest.csv
@@ -580,9 +806,10 @@ Only placeholder `.gitkeep` files and documentation screenshots are committed.
 * Item-level matching currently uses order-based comparison.
 * Store name extraction is still heuristic-based.
 * Invoice ID extraction can still fail when OCR misreads the entire code or when the receipt has no explicit label.
-* Quantity extraction remains weaker than price extraction because some receipts omit quantity or place it in ambiguous columns.
+* The default text-based parser still has weaker quantity and item-name performance than the layout-aware candidate.
 * The optional OCR text correction layer improves readability and average similarity, but it does not improve item-name accuracy yet.
-* The system does not currently use a document understanding model or a trained layout-aware extraction model.
+* The layout-aware parser candidate depends on OCR bounding-box CSV files generated from PaddleOCR output.
+* The layout-aware parser has not yet been integrated into the default Streamlit flow.
 * Optional LLM/API correction is not part of the core deterministic pipeline yet.
 
 ## Roadmap
@@ -603,19 +830,24 @@ Completed:
 10. OCR layout inspection utility.
 11. Optional OCR text correction experiment.
 12. Corrected item-name evaluation.
+13. Layout-aware item parser experiment.
+14. Layout-aware item parser candidate.
+15. Layout-aware item-level evaluation.
 
 Planned improvements:
 
-1. Improve optional OCR text correction using a larger correction dictionary or LLM-based correction.
-2. Add layout-aware item parsing using OCR bounding boxes.
-3. Add OpenCV preprocessing experiments.
-4. Compare PaddleOCR with VietOCR.
-5. Expand the evaluation dataset.
-6. Add optional LLM-based structured parser for difficult receipts.
-7. Add FastAPI backend for API serving.
-8. Add Docker support.
-9. Improve store name extraction.
-10. Add fuzzy item alignment for item-level evaluation.
+1. Integrate the layout-aware item parser into the main extraction pipeline.
+2. Add a Streamlit option to choose between default and layout-aware item extraction.
+3. Validate the layout-aware parser on a larger dataset.
+4. Improve optional OCR text correction using a larger correction dictionary or LLM-based correction.
+5. Add OpenCV preprocessing experiments.
+6. Compare PaddleOCR with VietOCR.
+7. Expand the evaluation dataset.
+8. Add optional LLM-based structured parser for difficult receipts.
+9. Add FastAPI backend for API serving.
+10. Add Docker support.
+11. Improve store name extraction.
+12. Add fuzzy item alignment for item-level evaluation.
 
 ## Project Status
 
@@ -624,6 +856,14 @@ Current status:
 ```text
 rule_based_v0.3 completed
 optional OCR text correction experiment completed
+layout_aware_item_v0.4_candidate completed
+```
+
+Current parser versions:
+
+```text
+default parser              : rule_based_v0.3
+layout-aware item candidate : layout_aware_item_v0.4_candidate
 ```
 
 Implemented:
@@ -639,6 +879,8 @@ Implemented:
 * OCR layout inspection utility
 * optional OCR text correction
 * corrected item-name evaluation
+* layout-aware item parser candidate
+* layout-aware item evaluation
 * Streamlit UI
 * SQLite storage
 * JSON/CSV export
@@ -646,12 +888,19 @@ Implemented:
 * error analysis reports
 * demo screenshots
 
-Current evaluation:
+Current default evaluation:
 
 ```text
 receipt-level overall accuracy : 92.22%
 item-level overall accuracy    : 87.82%
 items count accuracy           : 100.00%
+```
+
+Current layout-aware candidate evaluation:
+
+```text
+layout-aware item-level overall accuracy : 100.00%
+layout-aware item count accuracy         : 100.00%
 ```
 
 OCR text correction experiment:
@@ -666,5 +915,5 @@ regressed rows               : 0
 Next phase:
 
 ```text
-Improve OCR text correction and add layout-aware parsing
+Integrate layout-aware item parsing into the main app and validate it on a larger dataset.
 ```
