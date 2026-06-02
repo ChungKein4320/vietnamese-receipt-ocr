@@ -25,6 +25,15 @@ ITEM_PARSER_MODES = {
     "layout_aware_v0.4_candidate": "Layout parser v0.4",
 }
 SUPPORTED_IMAGE_TYPES = ["png", "jpg", "jpeg"]
+ITEM_TABLE_NUMERIC_COLUMNS = ["quantity", "unit_price", "line_total"]
+DATABASE_TABLE_NUMERIC_COLUMNS = [
+    "id",
+    "total_amount",
+    "vat",
+    "service_fee",
+    "num_ocr_lines",
+    "items_count",
+]
 
 
 def inject_custom_css() -> None:
@@ -539,6 +548,75 @@ def items_to_dataframe(items: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(items)
 
 
+def format_number_for_display(value) -> str:
+    """
+    Format numeric values with comma separators for UI tables.
+
+    Examples:
+        10000 -> 10,000
+        6.5   -> 6.5
+
+    Non-numeric values are returned as-is.
+    """
+    if value is None:
+        return ""
+
+    try:
+        if pd.isna(value):
+            return ""
+    except TypeError:
+        pass
+
+    if isinstance(value, bool):
+        return str(value)
+
+    if isinstance(value, int):
+        return f"{value:,}"
+
+    if isinstance(value, float):
+        if value.is_integer():
+            return f"{int(value):,}"
+
+        return f"{value:,.4f}".rstrip("0").rstrip(".")
+
+    text = str(value).strip()
+
+    if not text:
+        return ""
+
+    if re.fullmatch(r"-?\d+(?:\.\d+)?", text):
+        number = float(text)
+
+        if number.is_integer():
+            return f"{int(number):,}"
+
+        return f"{number:,.4f}".rstrip("0").rstrip(".")
+
+    return text
+
+
+def format_dataframe_for_display(
+    dataframe: pd.DataFrame,
+    numeric_columns: list[str] | None = None,
+) -> pd.DataFrame:
+    """
+    Return a display-only DataFrame with selected numeric columns formatted.
+
+    The original DataFrame remains unchanged for calculations and CSV export.
+    """
+    if dataframe.empty:
+        return dataframe
+
+    display_df = dataframe.copy()
+    columns_to_format = set(numeric_columns or [])
+
+    for column in columns_to_format:
+        if column in display_df.columns:
+            display_df[column] = display_df[column].map(format_number_for_display)
+
+    return display_df
+
+
 def receipt_item_to_dict(item) -> dict:
     return {
         "name": item.name,
@@ -716,7 +794,7 @@ def format_value(value) -> str:
         return "Not found"
 
     if isinstance(value, int):
-        return f"{value:,}".replace(",", ".")
+        return f"{value:,}"
 
     return str(value)
 
@@ -726,7 +804,7 @@ def format_money(value) -> str:
         return "Not found"
 
     try:
-        return f"{int(value):,} VND".replace(",", ".")
+        return f"{int(value):,} VND"
     except (TypeError, ValueError):
         return str(value)
 
@@ -924,7 +1002,14 @@ def render_overview(result_dict: dict, items_df: pd.DataFrame) -> None:
 
     if not items_df.empty:
         st.markdown("#### 🛒 Item preview")
-        st.dataframe(items_df, use_container_width=True, hide_index=True)
+        st.dataframe(
+            format_dataframe_for_display(
+                items_df,
+                numeric_columns=ITEM_TABLE_NUMERIC_COLUMNS,
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
 
 
 def render_database_tab(result_dict: dict) -> None:
@@ -963,7 +1048,10 @@ def render_database_tab(result_dict: dict) -> None:
                 )
 
             st.dataframe(
-                saved_receipts_df,
+                format_dataframe_for_display(
+                    saved_receipts_df,
+                    numeric_columns=DATABASE_TABLE_NUMERIC_COLUMNS,
+                ),
                 use_container_width=True,
                 hide_index=True,
             )
@@ -1222,7 +1310,14 @@ def main() -> None:
         if items_df.empty:
             st.info("No items extracted.")
         else:
-            st.dataframe(items_df, use_container_width=True, hide_index=True)
+            st.dataframe(
+                format_dataframe_for_display(
+                    items_df,
+                    numeric_columns=ITEM_TABLE_NUMERIC_COLUMNS,
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
 
             st.markdown("#### 📈 Item statistics")
 
