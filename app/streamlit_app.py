@@ -14,11 +14,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT))
 
 from receipt_ocr.database import count_receipts, fetch_all_receipts, save_extraction_to_db
+from receipt_ocr.layout_item_parser import LayoutRow, parse_layout_items_from_rows
 from receipt_ocr.ocr_engine import ocr_lines_to_text, run_ocr
 from receipt_ocr.receipt_parser import parse_receipt_text
 
 
 TMP_UPLOAD_DIR = PROJECT_ROOT / ".tmp_streamlit"
+ITEM_PARSER_MODES = {
+    "text_based_v0.3": "Text-based parser v0.3",
+    "layout_aware_v0.4_candidate": "Layout-aware item parser v0.4 candidate",
+}
 SUPPORTED_IMAGE_TYPES = ["png", "jpg", "jpeg"]
 
 
@@ -534,6 +539,178 @@ def items_to_dataframe(items: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(items)
 
 
+def receipt_item_to_dict(item) -> dict:
+    return {
+        "name": item.name,
+        "quantity": item.quantity,
+        "unit_price": item.unit_price,
+        "line_total": item.line_total,
+    }
+
+
+def normalize_ocr_box(box) -> list[list[float]] | None:
+    """
+    Normalize OCR box to 4 points:
+        [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
+
+    Supports:
+    - PaddleOCR polygon boxes
+    - [x_min, y_min, x_max, y_max]
+    """
+    if box is None:
+        return None
+
+    if isinstance(box, list) and len(box) == 4:
+        if all(isinstance(point, (list, tuple)) and len(point) >= 2 for point in box):
+            return [[float(point[0]), float(point[1])] for point in box]
+
+        if all(isinstance(value, (int, float)) for value in box):
+            x_min, y_min, x_max, y_max = [float(value) for value in box]
+
+            return [
+                [x_min, y_min],
+                [x_max, y_min],
+                [x_max, y_max],
+                [x_min, y_max],
+            ]
+
+    return None
+
+
+def get_ocr_line_box(line: dict):
+    return (
+        line.get("box")
+        or line.get("bbox")
+        or line.get("points")
+        or line.get("poly")
+    )
+
+
+def get_box_stats(box: list[list[float]]) -> dict[str, float]:
+    xs = [point[0] for point in box]
+    ys = [point[1] for point in box]
+
+    x_min = min(xs)
+    x_max = max(xs)
+    y_min = min(ys)
+    y_max = max(ys)
+
+    return {
+        "x_min": x_min,
+        "x_max": x_max,
+        "y_min": y_min,
+        "y_max": y_max,
+        "x_center": (x_min + x_max) / 2,
+        "y_center": (y_min + y_max) / 2,
+    }
+
+
+def ocr_lines_to_layout_rows(
+    ocr_lines: list[dict],
+    receipt_id: str,
+    y_tolerance: float = 12.0,
+) -> list[LayoutRow]:
+    """
+    Convert OCR lines from Streamlit runtime into LayoutRow objects.
+
+    This avoids writing intermediate layout CSV files during app usage.
+    """
+    records = []
+
+    for line in ocr_lines:
+        text = str(line.get("text") or "").strip()
+
+        if not text:
+            continue
+
+        box = normalize_ocr_box(get_ocr_line_box(line))
+
+        if box is None:
+            continue
+
+        stats = get_box_stats(box)
+
+        records.append(
+            {
+                "text": text,
+                **stats,
+            }
+        )
+
+    if not records:
+        raise ValueError(
+            "No OCR bounding boxes found. Layout-aware parser requires OCR box coordinates."
+        )
+
+    records = sorted(records, key=lambda record: (record["y_center"], record["x_min"]))
+
+    row_centers: list[float] = []
+    grouped: dict[int, list[dict]] = {}
+
+    for record in records:
+        y_center = float(record["y_center"])
+        assigned_row_id = None
+
+        for row_index, row_center in enumerate(row_centers):
+            if abs(y_center - row_center) <= y_tolerance:
+                assigned_row_id = row_index + 1
+                row_centers[row_index] = (row_center + y_center) / 2
+                break
+
+        if assigned_row_id is None:
+            row_centers.append(y_center)
+            assigned_row_id = len(row_centers)
+
+        grouped.setdefault(assigned_row_id, []).append(record)
+
+    layout_rows = []
+
+    for row_id, row_records in sorted(grouped.items()):
+        row_records = sorted(row_records, key=lambda record: record["x_min"])
+
+        layout_rows.append(
+            LayoutRow(
+                receipt_id=receipt_id,
+                row_id=row_id,
+                texts=[record["text"] for record in row_records],
+                x_mins=[float(record["x_min"]) for record in row_records],
+            )
+        )
+
+    return layout_rows
+
+
+def apply_layout_aware_items(
+    result_dict: dict,
+    ocr_lines: list[dict],
+    receipt_id: str,
+) -> dict:
+    """
+    Replace text-based parser items with layout-aware parser items.
+
+    Receipt-level fields remain from rule_based_v0.3.
+    """
+    layout_rows = ocr_lines_to_layout_rows(
+        ocr_lines=ocr_lines,
+        receipt_id=receipt_id,
+    )
+
+    layout_items = parse_layout_items_from_rows(layout_rows)
+
+    updated_result = dict(result_dict)
+    updated_result["original_parser_version"] = result_dict.get("parser_version")
+    updated_result["parser_version"] = "rule_based_v0.3+layout_aware_item_v0.4_candidate"
+    updated_result["item_parser_version"] = "layout_aware_item_v0.4_candidate"
+    updated_result["item_parser_mode"] = "layout_aware_v0.4_candidate"
+
+    updated_result["items"] = [
+        receipt_item_to_dict(item.to_receipt_item())
+        for item in layout_items
+    ]
+
+    return updated_result
+
+
 def format_value(value) -> str:
     if value is None or value == "":
         return "Not found"
@@ -621,7 +798,19 @@ def reset_state_for_new_upload(uploaded_file_name: str) -> None:
         st.session_state.pop("receipt_id", None)
 
 
-def run_pipeline(image_path: Path, receipt_id: str, lang: str) -> None:
+def reset_result_state() -> None:
+    st.session_state.pop("ocr_lines", None)
+    st.session_state.pop("ocr_text", None)
+    st.session_state.pop("result_dict", None)
+    st.session_state.pop("items_df", None)
+
+
+def run_pipeline(
+    image_path: Path,
+    receipt_id: str,
+    lang: str,
+    item_parser_mode: str,
+) -> None:
     with st.status("Running OCR and information extraction...", expanded=True) as status:
         st.write("Loading PaddleOCR model and reading receipt image...")
         ocr_lines = run_ocr(image_path=image_path, lang=lang)
@@ -629,7 +818,7 @@ def run_pipeline(image_path: Path, receipt_id: str, lang: str) -> None:
         st.write("Converting OCR lines to raw text...")
         ocr_text = ocr_lines_to_text(ocr_lines)
 
-        st.write("Running rule-based information extraction...")
+        st.write("Running rule-based receipt-level extraction...")
         extraction_result = parse_receipt_text(
             receipt_id=receipt_id,
             text=ocr_text,
@@ -637,6 +826,31 @@ def run_pipeline(image_path: Path, receipt_id: str, lang: str) -> None:
         )
 
         result_dict = extraction_result.to_dict()
+        result_dict["item_parser_mode"] = item_parser_mode
+
+        if item_parser_mode == "layout_aware_v0.4_candidate":
+            st.write("Replacing item rows with layout-aware item parser output...")
+
+            try:
+                result_dict = apply_layout_aware_items(
+                    result_dict=result_dict,
+                    ocr_lines=ocr_lines,
+                    receipt_id=receipt_id,
+                )
+            except Exception as exc:
+                warnings = result_dict.get("warnings") or []
+                warnings.append(f"layout_item_parser_failed: {type(exc).__name__}")
+                result_dict["warnings"] = warnings
+                result_dict["item_parser_version"] = "text_based_fallback"
+                result_dict["item_parser_mode"] = "text_based_v0.3"
+
+                st.warning(
+                    "Layout-aware item parser failed. "
+                    "Falling back to text-based parser v0.3."
+                )
+        else:
+            result_dict["item_parser_version"] = "text_based_v0.3"
+
         items_df = items_to_dataframe(result_dict["items"])
 
         st.session_state["ocr_lines"] = ocr_lines
@@ -644,7 +858,7 @@ def run_pipeline(image_path: Path, receipt_id: str, lang: str) -> None:
         st.session_state["result_dict"] = result_dict
         st.session_state["items_df"] = items_df
 
-        status.update(label="Pipeline completed.", state="complete", expanded=False)
+        status.update(label="Pipeline completed", state="complete", expanded=False)
 
 
 def render_overview(result_dict: dict, items_df: pd.DataFrame) -> None:
@@ -829,6 +1043,24 @@ def main() -> None:
             help="Current MVP baseline uses PaddleOCR lang='en'.",
         )
 
+        item_parser_mode = st.selectbox(
+            "Item parser mode",
+            options=list(ITEM_PARSER_MODES.keys()),
+            format_func=lambda key: ITEM_PARSER_MODES[key],
+            index=0,
+            help=(
+                "Text-based parser is the stable default. "
+                "Layout-aware parser is a v0.4 candidate that uses OCR bounding boxes."
+            ),
+        )
+
+        previous_item_parser_mode = st.session_state.get("selected_item_parser_mode")
+
+        if previous_item_parser_mode is not None and previous_item_parser_mode != item_parser_mode:
+            reset_result_state()
+
+        st.session_state["selected_item_parser_mode"] = item_parser_mode
+
         st.divider()
 
         st.header("Debug options")
@@ -840,7 +1072,7 @@ def main() -> None:
 
         st.header("Project status")
         st.markdown(
-            """
+            f"""
             <div style="margin-top:0.5rem;">
                 <div class="sidebar-status-row">
                     <span class="sidebar-status-label">MVP pipeline</span>
@@ -852,7 +1084,7 @@ def main() -> None:
                 </div>
                 <div class="sidebar-status-row">
                     <span class="sidebar-status-label">Parser</span>
-                    <span class="sidebar-status-value">rule-based v0.1</span>
+                    <span class="sidebar-status-value">{escape_html(ITEM_PARSER_MODES[item_parser_mode])}</span>
                 </div>
                 <div class="sidebar-status-row" style="border-bottom:none;">
                     <span class="sidebar-status-label">Database</span>
@@ -919,6 +1151,7 @@ def main() -> None:
 
         with st.container(border=True):
             st.markdown("#### ⚡ Run extraction")
+            st.caption(f"Item parser: {ITEM_PARSER_MODES[item_parser_mode]}")
 
             if uploaded_file is None:
                 st.info("Upload a receipt image to enable the pipeline.")
@@ -944,6 +1177,7 @@ def main() -> None:
             image_path=st.session_state["image_path"],
             receipt_id=st.session_state["receipt_id"],
             lang=lang,
+            item_parser_mode=item_parser_mode,
         )
 
     if "result_dict" not in st.session_state:
