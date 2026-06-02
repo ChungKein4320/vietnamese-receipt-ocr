@@ -21,8 +21,8 @@ from receipt_ocr.receipt_parser import parse_receipt_text
 
 TMP_UPLOAD_DIR = PROJECT_ROOT / ".tmp_streamlit"
 ITEM_PARSER_MODES = {
-    "text_based_v0.3": "Text-based parser v0.3",
-    "layout_aware_v0.4_candidate": "Layout-aware item parser v0.4 candidate",
+    "text_based_v0.3": "Text parser v0.3",
+    "layout_aware_v0.4_candidate": "Layout parser v0.4",
 }
 SUPPORTED_IMAGE_TYPES = ["png", "jpg", "jpeg"]
 
