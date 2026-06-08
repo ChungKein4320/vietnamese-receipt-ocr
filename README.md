@@ -36,12 +36,14 @@ The system takes a receipt image as input, runs OCR, extracts structured receipt
 * Display raw OCR text for debugging.
 * Display structured JSON output.
 * Display extracted item table.
+* Format numeric values in Streamlit tables for better readability.
 * Save extraction results to SQLite.
 * Export receipt-level and item-level data to JSON/CSV.
 * Evaluate extraction quality against manually created ground truth labels.
 * Inspect OCR bounding boxes for layout-level debugging.
 * Optionally apply OCR text correction to store names and item names.
 * Run a layout-aware item parser candidate using OCR bounding-box rows.
+* Switch item parser mode directly in the Streamlit sidebar.
 
 ## Extracted Fields
 
@@ -100,11 +102,13 @@ vietnamese-receipt-ocr/
 │   ├── screenshots/
 │   ├── corrected_item_evaluation.md
 │   ├── dataset_strategy.md
+│   ├── devlog.md
 │   ├── error_analysis.md
 │   ├── item_level_evaluation.md
 │   ├── layout_aware_item_evaluation.md
 │   ├── layout_item_parser_experiment.md
-│   └── mvp_scope.md
+│   ├── mvp_scope.md
+│   └── release_notes_v0.4.md
 │
 ├── notebooks/
 │   └── 01_ocr_baseline.ipynb
@@ -187,6 +191,16 @@ OCR JSON with bounding boxes
 → Layout-aware item parsing
 → Layout-aware extracted JSON
 → Layout-aware item evaluation
+```
+
+Streamlit app flow:
+
+```text
+Upload image
+→ Select parser mode
+→ Run OCR + extraction
+→ Review overview / item table / OCR debug / JSON
+→ Save to SQLite or download JSON/CSV
 ```
 
 ## Installation
@@ -289,7 +303,7 @@ data/evaluation/evaluation_report.csv
 data/evaluation/evaluation_summary.json
 ```
 
-### 9. Run item-level evaluation
+### 9. Run default item-level evaluation
 
 ```powershell
 python scripts/evaluate_items.py
@@ -429,23 +443,32 @@ The app supports:
 
 * receipt image upload
 * OCR execution
-* rule-based extraction
-* JSON preview
+* parser mode selection
+* text parser v0.3
+* layout parser v0.4
+* structured JSON preview
 * item table preview
+* formatted numeric values in tables
 * raw OCR text debugging
 * SQLite save
 * JSON/CSV download
 
-## Streamlit App Flow
+## Streamlit Parser Modes
+
+The Streamlit app supports two item parser modes:
+
+| UI Label           | Internal Version                   | Description                                                 |
+| ------------------ | ---------------------------------- | ----------------------------------------------------------- |
+| Text parser v0.3   | `text_based_v0.3`                  | Stable default item parser based on OCR text order          |
+| Layout parser v0.4 | `layout_aware_item_v0.4_candidate` | Layout-aware item parser candidate using OCR bounding boxes |
+
+The default mode is:
 
 ```text
-Upload image
-→ Run OCR + Extraction
-→ Review extracted fields
-→ Review item table
-→ Save result to SQLite
-→ Download JSON/CSV
+Text parser v0.3
 ```
+
+The layout-aware parser is optional and can be selected from the sidebar.
 
 ## Evaluation
 
@@ -466,6 +489,12 @@ Current layout-aware item parser candidate:
 
 ```text
 layout_aware_item_v0.4_candidate
+```
+
+Current Streamlit UI milestone:
+
+```text
+v0.4-streamlit-layout-mode
 ```
 
 ### Receipt-level Evaluation
@@ -519,7 +548,7 @@ This result is measured on the current MVP evaluation set of 15 receipts and 39 
 
 The default parser remains `rule_based_v0.3`.
 
-The layout-aware parser is currently evaluated separately and writes output to:
+The layout-aware parser is currently available as an optional Streamlit item parser mode and can also write separate outputs to:
 
 ```text
 data/layout_extracted_results/
@@ -602,7 +631,7 @@ item_name      : 84.62%
 
 The layout-aware item parser candidate improves item extraction by using OCR bounding-box row structure. On the current MVP dataset, it reaches 100.00% item-level accuracy across item count, name, quantity, unit price, and line total.
 
-The remaining receipt-level errors are mostly caused by OCR recognition mistakes, spelling distortion, missing quantity values, and layout variation.
+The remaining receipt-level errors are mostly caused by OCR recognition mistakes, spelling distortion, and layout variation.
 
 ## OCR Error Pattern
 
@@ -775,6 +804,21 @@ On the current MVP evaluation set:
 
 This result shows that the layout-aware parser is a strong candidate for the next parser version. However, it is still treated as a candidate because it has only been validated on the current MVP dataset, not on a larger production-scale benchmark.
 
+## Git Tags / Milestones
+
+Current project milestones:
+
+| Tag                           | Description                                                     |
+| ----------------------------- | --------------------------------------------------------------- |
+| `v1.0-mvp`                    | Initial Streamlit MVP release                                   |
+| `v0.3-rule-based-parser`      | Rule-based parser v0.3 milestone                                |
+| `v0.4-layout-aware-candidate` | Layout-aware item parser candidate                              |
+| `v0.4-streamlit-layout-mode`  | Streamlit UI with parser mode selection and updated screenshots |
+
+## Release Notes
+
+* [v0.4 Streamlit Layout Parser Mode](docs/release_notes_v0.4.md)
+
 ## Data Privacy and Git Tracking
 
 Private or local data is ignored by Git.
@@ -808,8 +852,8 @@ Only placeholder `.gitkeep` files and documentation screenshots are committed.
 * Invoice ID extraction can still fail when OCR misreads the entire code or when the receipt has no explicit label.
 * The default text-based parser still has weaker quantity and item-name performance than the layout-aware candidate.
 * The optional OCR text correction layer improves readability and average similarity, but it does not improve item-name accuracy yet.
-* The layout-aware parser candidate depends on OCR bounding-box CSV files generated from PaddleOCR output.
-* The layout-aware parser has not yet been integrated into the default Streamlit flow.
+* The layout-aware parser candidate depends on OCR bounding boxes.
+* The layout-aware parser has not yet been validated on a larger external dataset.
 * Optional LLM/API correction is not part of the core deterministic pipeline yet.
 
 ## Roadmap
@@ -833,21 +877,24 @@ Completed:
 13. Layout-aware item parser experiment.
 14. Layout-aware item parser candidate.
 15. Layout-aware item-level evaluation.
+16. Streamlit parser mode selection.
+17. Numeric formatting in Streamlit tables.
+18. Updated Streamlit screenshots.
+19. v0.4 release notes.
 
 Planned improvements:
 
-1. Integrate the layout-aware item parser into the main extraction pipeline.
-2. Add a Streamlit option to choose between default and layout-aware item extraction.
-3. Validate the layout-aware parser on a larger dataset.
-4. Improve optional OCR text correction using a larger correction dictionary or LLM-based correction.
-5. Add OpenCV preprocessing experiments.
+1. Validate the layout-aware parser on more receipt formats.
+2. Add more ground-truth labeled receipts.
+3. Improve store name extraction.
+4. Add OCR preprocessing experiments.
+5. Improve optional OCR text correction using a larger correction dictionary or LLM-based correction.
 6. Compare PaddleOCR with VietOCR.
 7. Expand the evaluation dataset.
 8. Add optional LLM-based structured parser for difficult receipts.
 9. Add FastAPI backend for API serving.
 10. Add Docker support.
-11. Improve store name extraction.
-12. Add fuzzy item alignment for item-level evaluation.
+11. Add fuzzy item alignment for item-level evaluation.
 
 ## Project Status
 
@@ -857,6 +904,7 @@ Current status:
 rule_based_v0.3 completed
 optional OCR text correction experiment completed
 layout_aware_item_v0.4_candidate completed
+Streamlit layout parser mode completed
 ```
 
 Current parser versions:
@@ -881,11 +929,13 @@ Implemented:
 * corrected item-name evaluation
 * layout-aware item parser candidate
 * layout-aware item evaluation
-* Streamlit UI
+* Streamlit parser mode selector
+* formatted numeric values in Streamlit tables
 * SQLite storage
 * JSON/CSV export
 * evaluation reports
 * error analysis reports
+* release notes
 * demo screenshots
 
 Current default evaluation:
@@ -915,5 +965,5 @@ regressed rows               : 0
 Next phase:
 
 ```text
-Integrate layout-aware item parsing into the main app and validate it on a larger dataset.
+Validate layout-aware item parsing on a larger dataset and improve receipt-level field extraction.
 ```
