@@ -1,0 +1,25 @@
+{
+  "receipt_id": "receipt_001",
+  "source_ocr_path": "data/sample/receipt_001_ocr.txt",
+  "store_name": "VinCommerce",
+  "datetime": "2020-08-15 10:28",
+  "invoice_id": "H00133765",
+  "items": [
+    {
+      "name": "CP_Thit heo xay 300g",
+      "quantity": 2,
+      "unit_price": 49500,
+      "line_total": 99000
+    }
+  ],
+  "vat": null,
+  "service_fee": null,
+  "total_amount": 99000,
+  "payment_method": "cash",
+  "num_ocr_lines": 40,
+  "parser_version": "rule_based_v0.3+layout_aware_item_v0.4_candidate",
+  "warnings": [],
+  "original_parser_version": "rule_based_v0.3",
+  "item_parser_version": "layout_aware_item_v0.4_candidate",
+  "items_count": 1
+}

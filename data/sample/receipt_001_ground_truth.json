@@ -1,0 +1,20 @@
+{
+  "receipt_id": "receipt_001",
+  "image_path": "data/sample/receipt_001.png",
+  "store_name": "VinCommerce",
+  "datetime": "2020-08-15 10:28",
+  "invoice_id": "00133765",
+  "items": [
+    {
+      "name": "CP_Thịt heo xay 300g",
+      "quantity": 2,
+      "unit_price": 49500,
+      "line_total": 99000
+    }
+  ],
+  "vat": null,
+  "service_fee": 0,
+  "total_amount": 99000,
+  "payment_method": "cash",
+  "notes": "Receipt states VAT is included but does not show a separate VAT amount. Customer paid 100000 VND cash and received 1000 VND change."
+}

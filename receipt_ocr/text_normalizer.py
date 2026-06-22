@@ -148,12 +148,15 @@ def normalize_datetime_value(text: str) -> str | None:
         2020-08-15 10:28 -> 2020-08-15 10:28
     """
     patterns = [
+        # Check ISO-like year-first dates before day-first dates.
+        # Otherwise "2020-08-15 10:28" can be partially matched as
+        # "20-08-15 10:28" and incorrectly normalized to 2015-08-20.
         re.compile(
-            r"(?P<day>\d{1,2})[\/\-.](?P<month>\d{1,2})[\/\-.](?P<year>\d{2,4})"
+            r"(?P<year>\d{4})[\/\-.](?P<month>\d{1,2})[\/\-.](?P<day>\d{1,2})"
             r"\s+(?P<hour>\d{1,2})[:hH](?P<minute>\d{2})"
         ),
         re.compile(
-            r"(?P<year>\d{4})[\/\-.](?P<month>\d{1,2})[\/\-.](?P<day>\d{1,2})"
+            r"(?P<day>\d{1,2})[\/\-.](?P<month>\d{1,2})[\/\-.](?P<year>\d{2,4})"
             r"\s+(?P<hour>\d{1,2})[:hH](?P<minute>\d{2})"
         ),
         re.compile(

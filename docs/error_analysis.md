@@ -2,7 +2,7 @@
 
 ## Goal
 
-Analyze the remaining errors of the OCR + rule-based extraction pipeline after the MVP v1 implementation.
+Analyze the remaining errors of the current OCR + rule-based extraction pipeline after the `rule_based_v0.3` milestone.
 
 This report is generated from:
 
@@ -72,7 +72,7 @@ _No parser warnings found in the current evaluation report._
 
 ### Strongest field
 
-`total_amount` is currently the strongest field. The main improvement came from normalizing Vietnamese money formats such as `70.000d`, `80.000d`, `20.000d`, and `CASH(VND)-88000`.
+`payment_method` and `items_count` currently have no errors on the MVP dataset. `total_amount` is also strong after improving Vietnamese money normalization for formats such as `70.000d`, `80.000d`, `20.000d`, and `CASH(VND)-88000`.
 
 ### Weakest field
 
@@ -80,22 +80,23 @@ _No parser warnings found in the current evaluation report._
 
 ### Item extraction
 
-`items_count` is still unstable because item names, quantities, unit prices, and line totals are often split across multiple OCR lines. A pure text-based parser has limited layout awareness.
+`items_count` is correct on the current MVP dataset, but full item-field extraction is still harder for the text-based parser because item names, quantities, unit prices, and line totals are often split across multiple OCR lines. A pure text-based parser has limited layout awareness.
 
 ### Payment method
 
 `payment_method` is rule-based and depends on keyword matching. It can fail when OCR misses or corrupts words such as `tien mat`, `cash`, or card-related terms.
 
-## Parser v0.2 Improvement Plan
+## Current Improvement Plan
 
 Recommended priority order:
 
-1. Improve `invoice_id` extraction with stricter receipt-code patterns.
-2. Improve `datetime` parsing for split date/time lines and OCR-corrupted separators.
-3. Improve `payment_method` keyword normalization.
-4. Add item-level evaluation beyond `items_count`.
-5. Start layout-aware item parsing using PaddleOCR bounding boxes.
+1. Improve `store_name` extraction for distorted receipt headers.
+2. Improve `invoice_id` extraction with stricter receipt-code patterns and better filtering against phone/cashier/order IDs.
+3. Validate the layout-aware item parser on more receipt layouts beyond the current MVP set.
+4. Add confidence-based warnings for suspicious predictions.
+5. Add a small reproducible sample dataset for GitHub users.
+6. Keep unit tests for normalizer and parser utilities up to date.
 
 ## Next Step
 
-Use this error analysis to implement `rule_based_v0.2` and compare it against `rule_based_v0.1` using the same evaluation pipeline.
+Use this error analysis to guide the next parser milestone and compare future changes against `rule_based_v0.3` and `layout_aware_item_v0.4_candidate` using the same evaluation pipeline.

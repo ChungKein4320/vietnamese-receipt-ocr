@@ -226,6 +226,24 @@ python -c "import paddle; print('paddle:', paddle.__version__)"
 python -c "from paddleocr import PaddleOCR; print('paddleocr import ok')"
 ```
 
+## Reproducible Sample
+
+A small public sample is included under:
+
+```text
+data/sample/
+```
+
+It contains one sample receipt image, OCR output, ground-truth labels, default parser output, and layout-aware parser output. This makes the repository easier to inspect without requiring the full local dataset.
+
+See:
+
+```text
+data/sample/README.md
+```
+
+The main evaluation metrics are still computed on the full MVP evaluation set of 15 receipts and 39 item rows, not only this single sample.
+
 ## Usage
 
 ### 1. Run OCR on one image

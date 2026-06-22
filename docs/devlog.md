@@ -20,8 +20,7 @@ Next planned work:
 Paused active implementation today.
 
 Current project state:
-- 
-ule_based_v0.3 remains the default text-based parser.
+- rule_based_v0.3 remains the default text-based parser.
 - layout_aware_item_v0.4_candidate has been integrated into Streamlit as an optional parser mode.
 - Streamlit now supports switching between Text parser v0.3 and Layout parser v0.4.
 - Next UI polish task: format numeric values in tables, e.g. 10000 -> 10,000.
