@@ -4,6 +4,23 @@ An end-to-end OCR and information extraction system for Vietnamese receipts and 
 
 The system takes a receipt image as input, runs OCR, extracts structured receipt fields, displays the result in a Streamlit UI, saves records to SQLite, and supports JSON/CSV export.
 
+## Reviewer Quick Summary
+
+This project is an end-to-end Vietnamese receipt OCR and information extraction system. It takes receipt images as input, runs OCR, extracts structured fields, stores records in SQLite, and supports JSON/CSV export through a Streamlit demo.
+
+### Highlights
+
+* Built an OCR pipeline using Python, PaddleOCR, OpenCV/Pillow, Streamlit, SQLite, and rule-based parsing.
+* Extracts receipt-level fields such as store name, datetime, invoice ID, payment method, totals, and item-level fields.
+* Includes ground-truth labels, evaluation scripts, error analysis, reproducible sample data, and parser comparison.
+* Current receipt-level overall field extraction accuracy: **92.22%** on the MVP evaluation set.
+* Default text-based item parser accuracy: **87.82%**.
+* Layout-aware item parser candidate improves item-level accuracy to **100.00%** on the current MVP set of **15 receipts / 39 item rows**.
+
+### Notes
+
+The evaluation set is intentionally small and should be interpreted as an MVP benchmark, not production-level generalization. The project focuses on practical OCR pipeline design, structured information extraction, evaluation, and error analysis.
+
 ## Demo
 
 ### Upload and receipt preview
