@@ -333,28 +333,28 @@ data/extracted_results/items_export.csv
 ### 8. Run receipt-level evaluation
 
 ```powershell
-python scripts/evaluate_extraction.py --all
+python scripts/evaluate_extraction.py --all --split development
 ```
 
 Output:
 
 ```text
-data/evaluation/evaluation_report.csv
-data/evaluation/evaluation_summary.json
+data/evaluation/development/evaluation_report.csv
+data/evaluation/development/evaluation_summary.json
 ```
 
 ### 9. Run default item-level evaluation
 
 ```powershell
-python scripts/evaluate_items.py
+python scripts/evaluate_items.py --split development
 ```
 
 Output:
 
 ```text
-data/evaluation/item_evaluation_report.csv
-data/evaluation/item_evaluation_summary.json
-docs/item_level_evaluation.md
+data/evaluation/development/item_evaluation_report.csv
+data/evaluation/development/item_evaluation_summary.json
+data/evaluation/development/item_evaluation.md
 ```
 
 ### 10. Generate error analysis report
@@ -434,15 +434,15 @@ data/layout_extracted_results/receipt_002_layout_extracted.json
 ### 15. Evaluate layout-aware item extraction
 
 ```powershell
-python scripts/evaluate_layout_items.py
+python scripts/evaluate_layout_items.py --split development
 ```
 
 Output:
 
 ```text
-data/evaluation/layout_aware_item_evaluation_report.csv
-data/evaluation/layout_aware_item_evaluation_summary.json
-docs/layout_aware_item_evaluation.md
+data/evaluation/development/layout_aware_item_evaluation_report.csv
+data/evaluation/development/layout_aware_item_evaluation_summary.json
+data/evaluation/development/layout_aware_item_evaluation.md
 ```
 
 ### 16. Apply optional OCR text correction
@@ -624,18 +624,22 @@ scripts/evaluate_corrected_items.py
 
 Evaluates raw item names versus corrected item names.
 
-Generated local reports:
+Generated reports are isolated by manifest split. For example, development outputs are:
 
 ```text
-data/evaluation/evaluation_report.csv
-data/evaluation/evaluation_summary.json
-data/evaluation/item_evaluation_report.csv
-data/evaluation/item_evaluation_summary.json
-data/evaluation/layout_aware_item_evaluation_report.csv
-data/evaluation/layout_aware_item_evaluation_summary.json
+data/evaluation/development/evaluation_report.csv
+data/evaluation/development/evaluation_summary.json
+data/evaluation/development/item_evaluation_report.csv
+data/evaluation/development/item_evaluation_summary.json
+data/evaluation/development/item_evaluation.md
+data/evaluation/development/layout_aware_item_evaluation_report.csv
+data/evaluation/development/layout_aware_item_evaluation_summary.json
+data/evaluation/development/layout_aware_item_evaluation.md
 data/evaluation/corrected_item_evaluation_report.csv
 data/evaluation/corrected_item_evaluation_summary.json
 ```
+
+Use `--split held_out` only after the manifest contains newly collected, frozen held-out receipts. The evaluator stops instead of producing an empty report when the requested split has no records.
 
 These files are treated as local evaluation outputs and are not committed to Git.
 

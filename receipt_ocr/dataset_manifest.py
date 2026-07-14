@@ -127,3 +127,25 @@ def load_dataset_manifest(
 def summarize_splits(records: list[DatasetRecord]) -> dict[str, int]:
     counts = Counter(record.split for record in records)
     return {split: counts.get(split, 0) for split in sorted(ALLOWED_SPLITS)}
+
+
+def records_for_split(
+    records: list[DatasetRecord],
+    split: str,
+) -> list[DatasetRecord]:
+    normalized_split = split.strip().lower()
+
+    if normalized_split not in ALLOWED_SPLITS:
+        allowed = ", ".join(sorted(ALLOWED_SPLITS))
+        raise ManifestValidationError(f"Split must be one of: {allowed}.")
+
+    selected_records = [
+        record for record in records if record.split == normalized_split
+    ]
+
+    if not selected_records:
+        raise ManifestValidationError(
+            f"No records found for split '{normalized_split}'."
+        )
+
+    return selected_records

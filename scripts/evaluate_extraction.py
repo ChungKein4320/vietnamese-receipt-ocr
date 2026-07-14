@@ -9,7 +9,17 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT))
 
-from receipt_ocr.config import EVALUATION_DIR, EXTRACTED_RESULT_DIR, GROUND_TRUTH_DIR
+from receipt_ocr.config import (
+    DATASET_MANIFEST_PATH,
+    EVALUATION_DIR,
+    EXTRACTED_RESULT_DIR,
+)
+from receipt_ocr.dataset_manifest import (
+    ALLOWED_SPLITS,
+    ManifestValidationError,
+    load_dataset_manifest,
+    records_for_split,
+)
 from receipt_ocr.evaluator import (
     evaluate_single_receipt,
     load_json,
@@ -17,13 +27,18 @@ from receipt_ocr.evaluator import (
 )
 
 
-def collect_ground_truth_files() -> list[Path]:
-    return sorted(GROUND_TRUTH_DIR.glob("receipt_*.json"))
-
-
 def prediction_path_for(ground_truth_path: Path) -> Path:
     receipt_id = ground_truth_path.stem
     return EXTRACTED_RESULT_DIR / f"{receipt_id}_extracted.json"
+
+
+def evaluation_output_dir(split: str, receipt_id: str | None = None) -> Path:
+    split_output_dir = EVALUATION_DIR / split
+
+    if receipt_id is None:
+        return split_output_dir
+
+    return split_output_dir / "single" / receipt_id
 
 
 def write_csv_report(rows: list[dict], output_path: Path) -> None:
@@ -73,6 +88,20 @@ def main() -> None:
         help="Evaluate all ground truth files.",
     )
 
+    parser.add_argument(
+        "--split",
+        choices=sorted(ALLOWED_SPLITS),
+        default="development",
+        help="Dataset split to evaluate (default: development).",
+    )
+
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        default=DATASET_MANIFEST_PATH,
+        help="Path to the dataset split manifest.",
+    )
+
     args = parser.parse_args()
 
     if args.receipt_id is None and not args.all:
@@ -81,20 +110,35 @@ def main() -> None:
     if args.receipt_id is not None and args.all:
         raise ValueError("Use either --receipt-id or --all, not both.")
 
+    try:
+        records = records_for_split(
+            load_dataset_manifest(
+                args.manifest,
+                project_root=PROJECT_ROOT,
+                check_files=True,
+            ),
+            args.split,
+        )
+    except ManifestValidationError as error:
+        parser.error(str(error))
+
     if args.receipt_id is not None:
-        ground_truth_files = [GROUND_TRUTH_DIR / f"{args.receipt_id}.json"]
-    else:
-        ground_truth_files = collect_ground_truth_files()
+        records = [record for record in records if record.receipt_id == args.receipt_id]
 
-    if not ground_truth_files:
-        raise FileNotFoundError(f"No ground truth files found in {GROUND_TRUTH_DIR}")
+        if not records:
+            parser.error(
+                f"Receipt '{args.receipt_id}' is not in split '{args.split}'."
+            )
 
-    EVALUATION_DIR.mkdir(parents=True, exist_ok=True)
+    split_output_dir = evaluation_output_dir(args.split, args.receipt_id)
+    split_output_dir.mkdir(parents=True, exist_ok=True)
 
     rows = []
     missing_predictions = []
 
-    for ground_truth_path in ground_truth_files:
+    for record in records:
+        ground_truth_path = PROJECT_ROOT / record.ground_truth_path
+
         if not ground_truth_path.exists():
             raise FileNotFoundError(f"Ground truth not found: {ground_truth_path}")
 
@@ -119,10 +163,16 @@ def main() -> None:
         for path in missing_predictions:
             print(f"- {path}")
 
-    summary = summarize_evaluation(rows)
+    if not rows:
+        raise FileNotFoundError(
+            f"No predictions available for split '{args.split}'."
+        )
 
-    csv_output_path = EVALUATION_DIR / "evaluation_report.csv"
-    json_output_path = EVALUATION_DIR / "evaluation_summary.json"
+    summary = summarize_evaluation(rows)
+    summary["split"] = args.split
+
+    csv_output_path = split_output_dir / "evaluation_report.csv"
+    json_output_path = split_output_dir / "evaluation_summary.json"
 
     write_csv_report(rows, csv_output_path)
 
@@ -140,4 +190,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-    

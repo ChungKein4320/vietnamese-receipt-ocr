@@ -84,7 +84,7 @@ Default parser: `rule_based_v0.3`
 Source summary:
 
 ```text
-data/evaluation/evaluation_summary.json
+data/evaluation/development/evaluation_summary.json
 ```
 
 ## Item-level Results
@@ -105,7 +105,7 @@ Default item extraction uses the text-based `rule_based_v0.3` parser.
 Source summary:
 
 ```text
-data/evaluation/item_evaluation_summary.json
+data/evaluation/development/item_evaluation_summary.json
 ```
 
 ### Layout-aware item parser candidate
@@ -124,7 +124,7 @@ Layout-aware item extraction uses `layout_aware_item_v0.4_candidate`.
 Source summary:
 
 ```text
-data/evaluation/layout_aware_item_evaluation_summary.json
+data/evaluation/development/layout_aware_item_evaluation_summary.json
 ```
 
 This result is measured on the same 15 receipts / 39 items used for development and error analysis. It is not a held-out result and should not be interpreted as proof of production-level generalization.
@@ -145,13 +145,13 @@ Run the full receipt-level pipeline:
 ```powershell
 python scripts/run_ocr.py --all
 python scripts/run_extraction.py --all
-python scripts/evaluate_extraction.py --all
+python scripts/evaluate_extraction.py --all --split development
 ```
 
 Evaluate default text-based item extraction:
 
 ```powershell
-python scripts/evaluate_items.py
+python scripts/evaluate_items.py --split development
 ```
 
 Run and evaluate layout-aware item extraction:
@@ -159,19 +159,25 @@ Run and evaluate layout-aware item extraction:
 ```powershell
 python scripts/batch_inspect_ocr_layout.py
 python scripts/run_layout_item_extraction.py --all
-python scripts/evaluate_layout_items.py
+python scripts/evaluate_layout_items.py --split development
 ```
 
 Evaluation outputs:
 
 ```text
-data/evaluation/evaluation_report.csv
-data/evaluation/evaluation_summary.json
-data/evaluation/item_evaluation_report.csv
-data/evaluation/item_evaluation_summary.json
-data/evaluation/layout_aware_item_evaluation_report.csv
-data/evaluation/layout_aware_item_evaluation_summary.json
+data/evaluation/development/evaluation_report.csv
+data/evaluation/development/evaluation_summary.json
+data/evaluation/development/item_evaluation_report.csv
+data/evaluation/development/item_evaluation_summary.json
+data/evaluation/development/item_evaluation.md
+data/evaluation/development/layout_aware_item_evaluation_report.csv
+data/evaluation/development/layout_aware_item_evaluation_summary.json
+data/evaluation/development/layout_aware_item_evaluation.md
 ```
+
+All three evaluator entry points default to `development`, select receipt IDs from `data/dataset_manifest.csv`, and write to a split-specific directory. Use `--split held_out` only for frozen receipts that were not used to develop parser rules. If a requested split has no rows, evaluation stops without writing an empty report.
+
+A receipt-level run with `--receipt-id` writes under `data/evaluation/<split>/single/<receipt_id>/`, so it cannot overwrite the full-split report.
 
 ## Current Development Evaluation Summary
 
@@ -194,7 +200,8 @@ data/evaluation/layout_aware_item_evaluation_summary.json
     "payment_method": 1.0,
     "items_count": 1.0
   },
-  "overall_accuracy": 0.9222
+  "overall_accuracy": 0.9222,
+  "split": "development"
 }
 ```
 

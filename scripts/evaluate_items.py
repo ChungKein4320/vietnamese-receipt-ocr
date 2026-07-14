@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import sys
@@ -13,12 +14,18 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT))
 
-from receipt_ocr.config import EVALUATION_DIR, EXTRACTED_RESULT_DIR, GROUND_TRUTH_DIR
-
-
-ITEM_REPORT_CSV = EVALUATION_DIR / "item_evaluation_report.csv"
-ITEM_SUMMARY_JSON = EVALUATION_DIR / "item_evaluation_summary.json"
-ITEM_ANALYSIS_MD = PROJECT_ROOT / "docs" / "item_level_evaluation.md"
+from receipt_ocr.config import (
+    DATASET_MANIFEST_PATH,
+    EVALUATION_DIR,
+    EXTRACTED_RESULT_DIR,
+    GROUND_TRUTH_DIR,
+)
+from receipt_ocr.dataset_manifest import (
+    ALLOWED_SPLITS,
+    ManifestValidationError,
+    load_dataset_manifest,
+    records_for_split,
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -125,8 +132,11 @@ def get_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return normalized_items
 
 
-def evaluate_receipt_items(receipt_id: str) -> list[dict[str, Any]]:
-    gt_path = GROUND_TRUTH_DIR / f"{receipt_id}.json"
+def evaluate_receipt_items(
+    receipt_id: str,
+    ground_truth_path: Path | None = None,
+) -> list[dict[str, Any]]:
+    gt_path = ground_truth_path or GROUND_TRUTH_DIR / f"{receipt_id}.json"
     pred_path = EXTRACTED_RESULT_DIR / f"{receipt_id}_extracted.json"
 
     gt_payload = load_json(gt_path)
@@ -215,15 +225,6 @@ def evaluate_receipt_items(receipt_id: str) -> list[dict[str, Any]]:
     return rows
 
 
-def find_receipt_ids() -> list[str]:
-    receipt_ids = []
-
-    for gt_path in sorted(GROUND_TRUTH_DIR.glob("receipt_*.json")):
-        receipt_ids.append(gt_path.stem)
-
-    return receipt_ids
-
-
 def safe_mean(values: pd.Series) -> float:
     if values.empty:
         return 0.0
@@ -294,7 +295,11 @@ def dataframe_to_markdown(df: pd.DataFrame) -> str:
     return "\n".join([header, separator, *rows])
 
 
-def build_markdown_report(report_df: pd.DataFrame, summary: dict[str, Any]) -> str:
+def build_markdown_report(
+    report_df: pd.DataFrame,
+    summary: dict[str, Any],
+    split: str = "development",
+) -> str:
     count_error_df = (
         report_df[["receipt_id", "gt_items_count", "pred_items_count", "items_count_ok"]]
         .drop_duplicates()
@@ -343,7 +348,7 @@ def build_markdown_report(report_df: pd.DataFrame, summary: dict[str, Any]) -> s
     lines.append("")
     lines.append("This report compares each ground-truth item with the predicted item at the same order index.")
     lines.append("")
-    lines.append("Treat results as development metrics unless the inputs come from a separately held-out split.")
+    lines.append(f"- Dataset split: `{split}`")
     lines.append("")
     lines.append("## Summary")
     lines.append("")
@@ -396,41 +401,80 @@ def build_markdown_report(report_df: pd.DataFrame, summary: dict[str, Any]) -> s
 
 
 def main() -> None:
-    EVALUATION_DIR.mkdir(parents=True, exist_ok=True)
-    ITEM_ANALYSIS_MD.parent.mkdir(parents=True, exist_ok=True)
+    parser = argparse.ArgumentParser(
+        description="Evaluate item extraction for one manifest-defined split."
+    )
+    parser.add_argument(
+        "--split",
+        choices=sorted(ALLOWED_SPLITS),
+        default="development",
+        help="Dataset split to evaluate (default: development).",
+    )
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        default=DATASET_MANIFEST_PATH,
+        help="Path to the dataset split manifest.",
+    )
+    args = parser.parse_args()
 
-    receipt_ids = find_receipt_ids()
+    try:
+        records = records_for_split(
+            load_dataset_manifest(
+                args.manifest,
+                project_root=PROJECT_ROOT,
+                check_files=True,
+            ),
+            args.split,
+        )
+    except ManifestValidationError as error:
+        parser.error(str(error))
 
-    if not receipt_ids:
-        raise FileNotFoundError(f"No ground truth JSON files found in: {GROUND_TRUTH_DIR}")
+    split_output_dir = EVALUATION_DIR / args.split
+    split_output_dir.mkdir(parents=True, exist_ok=True)
+    item_report_csv = split_output_dir / "item_evaluation_report.csv"
+    item_summary_json = split_output_dir / "item_evaluation_summary.json"
+    item_analysis_md = split_output_dir / "item_evaluation.md"
 
     all_rows = []
 
-    for receipt_id in receipt_ids:
+    for record in records:
+        receipt_id = record.receipt_id
         pred_path = EXTRACTED_RESULT_DIR / f"{receipt_id}_extracted.json"
 
         if not pred_path.exists():
             print(f"Skipping {receipt_id}: prediction not found at {pred_path}")
             continue
 
-        all_rows.extend(evaluate_receipt_items(receipt_id))
+        all_rows.extend(
+            evaluate_receipt_items(
+                receipt_id,
+                PROJECT_ROOT / record.ground_truth_path,
+            )
+        )
+
+    if not all_rows:
+        raise FileNotFoundError(
+            f"No predictions available for split '{args.split}'."
+        )
 
     report_df = pd.DataFrame(all_rows)
     summary = build_summary(report_df)
+    summary["split"] = args.split
 
-    report_df.to_csv(ITEM_REPORT_CSV, index=False, encoding="utf-8-sig")
-    ITEM_SUMMARY_JSON.write_text(
+    report_df.to_csv(item_report_csv, index=False, encoding="utf-8-sig")
+    item_summary_json.write_text(
         json.dumps(summary, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
-    markdown_report = build_markdown_report(report_df, summary)
-    ITEM_ANALYSIS_MD.write_text(markdown_report, encoding="utf-8")
+    markdown_report = build_markdown_report(report_df, summary, args.split)
+    item_analysis_md.write_text(markdown_report, encoding="utf-8")
 
     print("Item-level evaluation completed.")
-    print(f"- {ITEM_REPORT_CSV}")
-    print(f"- {ITEM_SUMMARY_JSON}")
-    print(f"- {ITEM_ANALYSIS_MD}")
+    print(f"- {item_report_csv}")
+    print(f"- {item_summary_json}")
+    print(f"- {item_analysis_md}")
 
     print("\nSummary:")
     print(json.dumps(summary, ensure_ascii=False, indent=2))

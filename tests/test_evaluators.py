@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from receipt_ocr import evaluator as receipt_evaluator
-from scripts import evaluate_items, evaluate_layout_items
+from scripts import evaluate_extraction, evaluate_items, evaluate_layout_items
 
 
 ITEM_EVALUATORS = [
@@ -272,3 +272,14 @@ def test_receipt_summary_averages_all_six_fields() -> None:
     assert summary["num_receipts"] == 1
     assert summary["overall_accuracy"] == 0.8333
     assert summary["field_accuracy"]["items_count"] == 0.0
+
+
+def test_single_receipt_report_cannot_overwrite_full_split_report() -> None:
+    full_report_dir = evaluate_extraction.evaluation_output_dir("development")
+    single_report_dir = evaluate_extraction.evaluation_output_dir(
+        "development",
+        "receipt_001",
+    )
+
+    assert single_report_dir == full_report_dir / "single" / "receipt_001"
+    assert single_report_dir != full_report_dir

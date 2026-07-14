@@ -3,6 +3,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 DATA_DIR = PROJECT_ROOT / "data"
+DATASET_MANIFEST_PATH = DATA_DIR / "dataset_manifest.csv"
 RAW_RECEIPT_DIR = DATA_DIR / "raw" / "receipts"
 PROCESSED_IMAGE_DIR = DATA_DIR / "processed" / "images"
 OCR_OUTPUT_DIR = DATA_DIR / "ocr_outputs"

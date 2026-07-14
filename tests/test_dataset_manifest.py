@@ -5,8 +5,10 @@ from pathlib import Path
 import pytest
 
 from receipt_ocr.dataset_manifest import (
+    DatasetRecord,
     ManifestValidationError,
     load_dataset_manifest,
+    records_for_split,
     summarize_splits,
 )
 
@@ -130,3 +132,35 @@ def test_manifest_reports_missing_referenced_file(tmp_path: Path) -> None:
             project_root=tmp_path,
             check_files=True,
         )
+
+
+def test_records_for_split_never_mixes_dataset_membership() -> None:
+    development = DatasetRecord(
+        receipt_id="receipt_dev",
+        split="development",
+        image_path=Path("data/dev.png"),
+        ground_truth_path=Path("data/dev.json"),
+    )
+    held_out = DatasetRecord(
+        receipt_id="receipt_test",
+        split="held_out",
+        image_path=Path("data/test.png"),
+        ground_truth_path=Path("data/test.json"),
+    )
+
+    assert records_for_split([development, held_out], "development") == [
+        development
+    ]
+    assert records_for_split([development, held_out], "held_out") == [held_out]
+
+
+def test_records_for_split_rejects_empty_split() -> None:
+    development = DatasetRecord(
+        receipt_id="receipt_dev",
+        split="development",
+        image_path=Path("data/dev.png"),
+        ground_truth_path=Path("data/dev.json"),
+    )
+
+    with pytest.raises(ManifestValidationError, match="No records found"):
+        records_for_split([development], "held_out")
