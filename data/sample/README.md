@@ -2,7 +2,7 @@
 
 This folder contains a small public sample that makes the repository easier to inspect without requiring the full local dataset.
 
-The sample is based on `receipt_001` from the MVP evaluation set.
+The sample is based on `receipt_001` from the MVP development benchmark.
 
 ## Files
 
@@ -26,10 +26,10 @@ receipt image
 → ground-truth comparison
 ```
 
-The full MVP evaluation set contains 15 receipts and 39 item rows. This folder includes only one sample to keep the public repository lightweight and easy to review.
+The full private MVP development benchmark contains 15 receipts and 39 item rows. This folder includes only one sample to keep the public repository lightweight and easy to review.
 
 ## Notes
 
 * The sample output files are provided as reproducible artifacts for portfolio review.
-* The current metrics in the main README are computed on the full 15-receipt MVP evaluation set, not only this single sample.
+* The metrics in the main README are development results from the full 15-receipt benchmark, not results from this single sample or a held-out test.
 * Some OCR text is imperfect because it reflects real OCR behavior on Vietnamese receipts.
