@@ -1,0 +1,2 @@
+receipt_id,split,image_path,ground_truth_path,store_type,image_quality,has_vat,has_items,notes
+receipt_001,development,data/sample/receipt_001.png,data/sample/receipt_001_ground_truth.json,minimart,good,true,true,Public smoke-test sample; not a held-out result

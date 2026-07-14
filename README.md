@@ -110,6 +110,7 @@ vietnamese-receipt-ocr/
 │   ├── layout_extracted_results/
 │   ├── ground_truth/
 │   ├── evaluation/
+│   ├── dataset_manifest.example.csv
 │   └── sample/
 │
 ├── database/
@@ -133,6 +134,7 @@ vietnamese-receipt-ocr/
 │   ├── __init__.py
 │   ├── config.py
 │   ├── database.py
+│   ├── dataset_manifest.py
 │   ├── evaluator.py
 │   ├── exporter.py
 │   ├── image_preprocessor.py
@@ -160,9 +162,13 @@ vietnamese-receipt-ocr/
 │   ├── run_extraction.py
 │   ├── run_layout_item_extraction.py
 │   ├── run_ocr.py
-│   └── summarize_layout_rows.py
+│   ├── summarize_layout_rows.py
+│   └── validate_dataset_manifest.py
 │
 ├── tests/
+│   ├── test_dataset_manifest.py
+│   ├── test_evaluators.py
+│   ├── test_image_preprocessor.py
 │   ├── test_receipt_parser.py
 │   └── test_text_normalizer.py
 │

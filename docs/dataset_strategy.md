@@ -131,19 +131,38 @@ Columns:
 | Column | Description |
 |---|---|
 | `receipt_id` | Stable receipt ID |
-| `file_name` | Image file name |
+| `split` | `development` or `held_out` |
+| `image_path` | Repository-relative path to the receipt image |
+| `ground_truth_path` | Repository-relative path to its annotation |
 | `store_type` | `cafe`, `minimart`, `restaurant`, `supermarket`, or `other` |
 | `image_quality` | `good`, `medium`, or `poor` |
 | `has_vat` | `true` or `false` |
 | `has_items` | `true` or `false` |
-| `split` | `test` or `dev` |
 | `notes` | Short description of the receipt |
 
-For the MVP, all receipts use:
+The four required columns are `receipt_id`, `split`, `image_path`, and `ground_truth_path`. The remaining metadata columns are optional.
+
+The existing 15-receipt MVP benchmark was used to develop rules and analyze errors, so every existing row must use:
 
 ```text
-split=test
+split=development
 ```
+
+Only newly collected receipts that have not been inspected or used to tune parser rules may use `split=held_out`. Freeze their labels before evaluation, do not change rules after inspecting held-out errors, and report development and held-out results separately.
+
+Use the tracked example as a starting point:
+
+```text
+data/dataset_manifest.example.csv
+```
+
+Validate the private manifest structure:
+
+```powershell
+python scripts/validate_dataset_manifest.py --check-files
+```
+
+The validator rejects legacy `test` labels, duplicate receipt IDs, unsafe paths, missing required columns, and optionally missing referenced files. A valid manifest with zero `held_out` rows is acceptable and means that no held-out result is available yet.
 
 ## Git Tracking Rules
 
