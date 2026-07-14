@@ -8,7 +8,7 @@ Current stable milestones:
 - rule_based_v0.3 parser completed
 - optional OCR text correction experiment completed
 - layout_aware_item_v0.4_candidate added
-- layout-aware item evaluation reached 100% on the current MVP dataset
+- layout-aware item evaluation reached 100% on the same MVP development benchmark used for parser development (not a held-out test)
 
 Next planned work:
 - update README for layout-aware parser candidate

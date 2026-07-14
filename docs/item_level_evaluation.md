@@ -6,6 +6,8 @@ Evaluate item extraction quality beyond receipt-level `items_count`.
 
 This report compares each ground-truth item with the predicted item at the same order index.
 
+These results come from the 15-receipt / 39-item MVP development benchmark used during parser development and error analysis. They are not held-out test results.
+
 ## Summary
 
 - Number of receipts: `15`
@@ -50,3 +52,4 @@ _No rows._
 - Name matching uses normalized text similarity with a threshold of `0.75`.
 - Numeric fields are evaluated with exact equality after number normalization.
 - This is a baseline item-level evaluator. Later versions can add fuzzy item alignment and layout-aware matching.
+- The private development inputs and generated evaluation artifacts are not committed, so this aggregate report cannot be regenerated from a fresh public checkout.

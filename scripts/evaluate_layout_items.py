@@ -311,6 +311,8 @@ def build_markdown_report(report_df: pd.DataFrame, summary: dict[str, Any]) -> s
         "come from the layout-aware item parser candidate."
     )
     lines.append("")
+    lines.append("Treat results as development metrics unless the inputs come from a separately held-out split.")
+    lines.append("")
     lines.append("## Summary")
     lines.append("")
     lines.append(f"- Number of receipts: `{summary['num_receipts']}`")
@@ -335,6 +337,7 @@ def build_markdown_report(report_df: pd.DataFrame, summary: dict[str, Any]) -> s
     lines.append("")
     lines.append("- This evaluator checks the production-like layout-aware JSON outputs.")
     lines.append("- It does not evaluate receipt-level fields such as store name, datetime, invoice ID, total amount, or payment method.")
+    lines.append("- Item rows are compared at the same order index; names pass at normalized similarity `>= 0.75`, and numeric fields use exact equality after normalization.")
     lines.append("- Current layout-aware item parsing still depends on OCR layout CSV files generated from PaddleOCR bounding boxes.")
     lines.append("- The main parser remains `rule_based_v0.3` until the layout-aware parser is fully integrated into the OCR pipeline.")
     lines.append("")

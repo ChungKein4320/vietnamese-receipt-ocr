@@ -343,6 +343,8 @@ def build_markdown_report(report_df: pd.DataFrame, summary: dict[str, Any]) -> s
     lines.append("")
     lines.append("This report compares each ground-truth item with the predicted item at the same order index.")
     lines.append("")
+    lines.append("Treat results as development metrics unless the inputs come from a separately held-out split.")
+    lines.append("")
     lines.append("## Summary")
     lines.append("")
     lines.append(f"- Number of receipts: `{summary['num_receipts']}`")

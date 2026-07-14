@@ -13,13 +13,12 @@ This project is an end-to-end Vietnamese receipt OCR and information extraction 
 * Built an OCR pipeline using Python, PaddleOCR, OpenCV/Pillow, Streamlit, SQLite, and rule-based parsing.
 * Extracts receipt-level fields such as store name, datetime, invoice ID, payment method, totals, and item-level fields.
 * Includes ground-truth labels, evaluation scripts, error analysis, reproducible sample data, and parser comparison.
-* Current receipt-level overall field extraction accuracy: **92.22%** on the MVP evaluation set.
-* Default text-based item parser accuracy: **87.82%**.
-* Layout-aware item parser candidate improves item-level accuracy to **100.00%** on the current MVP set of **15 receipts / 39 item rows**.
+* On a **15-receipt / 39-item MVP development benchmark**, the default parser reached **92.22%** receipt-field accuracy and **87.82%** item-field accuracy.
+* A layout-aware item parser prototype reached **100.00%** item-field accuracy on the **same development benchmark**.
 
 ### Notes
 
-The evaluation set is intentionally small and should be interpreted as an MVP benchmark, not production-level generalization. The project focuses on practical OCR pipeline design, structured information extraction, evaluation, and error analysis.
+The 15 receipts were used for parser development and error analysis, so these are development-set results, not held-out test results. They demonstrate the evaluation workflow but do not establish production-level generalization.
 
 ## Demo
 
@@ -259,7 +258,7 @@ See:
 data/sample/README.md
 ```
 
-The main evaluation metrics are still computed on the full MVP evaluation set of 15 receipts and 39 item rows, not only this single sample.
+The aggregate metrics are documented from the private MVP development benchmark of 15 receipts and 39 item rows, not from this single sample. Because those private inputs and generated artifacts are not tracked, a public checkout cannot independently reproduce the aggregate figures.
 
 ## Usage
 
@@ -536,6 +535,8 @@ v0.4-streamlit-layout-mode
 
 Receipt-level fields are evaluated using the default rule-based parser.
 
+All results in this section are development results from the same 15-receipt MVP benchmark. No held-out or external test result is reported yet.
+
 | Field          | Accuracy |
 | -------------- | -------: |
 | Store name     |   80.00% |
@@ -572,7 +573,7 @@ Layout-aware item extraction uses `layout_aware_item_v0.4_candidate`.
 | Line total                  |  100.00% |
 | Overall item field accuracy |  100.00% |
 
-This result is measured on the current MVP evaluation set of 15 receipts and 39 item rows. It should be interpreted as a strong candidate result, not as production-level generalization.
+This result is measured on the same 15-receipt / 39-item development benchmark used to tune and analyze the parsers. It is not a held-out test result and should not be interpreted as evidence of production-level generalization.
 
 ### Parser Comparison
 
@@ -632,9 +633,11 @@ data/evaluation/corrected_item_evaluation_summary.json
 
 These files are treated as local evaluation outputs and are not committed to Git.
 
+The private 15-receipt development data and generated evaluation artifacts are not included in the public repository. Therefore, the published aggregate figures are documented experiment snapshots and cannot be reproduced from a fresh public checkout. The tracked sample receipt supports a pipeline smoke test only; it does not reproduce the aggregate results.
+
 ## Key Findings
 
-The final rule-based parser reached strong performance on the 15-receipt MVP dataset.
+The final rule-based parser reached strong development performance on the 15-receipt MVP benchmark.
 
 The largest improvements came from:
 
@@ -664,7 +667,7 @@ quantity       : 74.36%
 item_name      : 84.62%
 ```
 
-The layout-aware item parser candidate improves item extraction by using OCR bounding-box row structure. On the current MVP dataset, it reaches 100.00% item-level accuracy across item count, name, quantity, unit price, and line total.
+The layout-aware item parser candidate improves item extraction by using OCR bounding-box row structure. On the same MVP development benchmark, it reaches 100.00% item-field accuracy across item name, quantity, unit price, and line total, with 100.00% item-count accuracy.
 
 The remaining receipt-level errors are mostly caused by OCR recognition mistakes, spelling distortion, and layout variation.
 
@@ -821,9 +824,9 @@ scripts/evaluate_layout_items.py
 
 Evaluates layout-aware item extraction results against ground truth.
 
-### Current Layout-aware Result
+### Current Layout-aware Development Result
 
-On the current MVP evaluation set:
+On the current MVP development benchmark:
 
 * 15 receipts
 * 39 ground-truth item rows
@@ -837,7 +840,7 @@ On the current MVP evaluation set:
 | Line total                  |  100.00% |
 | Overall item field accuracy |  100.00% |
 
-This result shows that the layout-aware parser is a strong candidate for the next parser version. However, it is still treated as a candidate because it has only been validated on the current MVP dataset, not on a larger production-scale benchmark.
+This result shows that the layout-aware parser is a promising candidate for the next parser version. However, the same receipts were used for development and error analysis, so the result is not a held-out estimate.
 
 ## Git Tags / Milestones
 
@@ -881,8 +884,9 @@ Only placeholder `.gitkeep` files and documentation screenshots are committed.
 
 * OCR recognition errors still affect item names and store names.
 * The parser is rule-based and may not generalize to completely unseen receipt layouts.
-* The current dataset is small and intended for MVP evaluation, not production benchmarking.
-* Item-level matching currently uses order-based comparison.
+* The current 15-receipt dataset is a development benchmark, not a held-out test set or production benchmark.
+* Item-level matching uses order-based comparison; item names pass at normalized similarity `>= 0.75`, while numeric item fields use exact equality after normalization.
+* The full development data and generated metric artifacts are private/ignored by Git, so aggregate results cannot be reproduced from a fresh public checkout.
 * Store name extraction is still heuristic-based.
 * Invoice ID extraction can still fail when OCR misreads the entire code or when the receipt has no explicit label.
 * The default text-based parser still has weaker quantity and item-name performance than the layout-aware candidate.
@@ -973,7 +977,7 @@ Implemented:
 * release notes
 * demo screenshots
 
-Current default evaluation:
+Current default development evaluation:
 
 ```text
 receipt-level overall accuracy : 92.22%
@@ -981,7 +985,7 @@ item-level overall accuracy    : 87.82%
 items count accuracy           : 100.00%
 ```
 
-Current layout-aware candidate evaluation:
+Current layout-aware candidate development evaluation (same 15 receipts / 39 items):
 
 ```text
 layout-aware item-level overall accuracy : 100.00%

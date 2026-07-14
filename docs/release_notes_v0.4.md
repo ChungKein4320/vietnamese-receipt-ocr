@@ -56,9 +56,9 @@ scripts/evaluate_layout_items.py
 * Updated Streamlit screenshots.
 * Added layout-aware item evaluation report.
 
-## Current Evaluation
+## Current Development Evaluation
 
-Evaluation set:
+MVP development benchmark:
 
 * 15 Vietnamese receipt/invoice images
 * 39 ground-truth item rows
@@ -105,9 +105,9 @@ Parser: `Layout parser v0.4`
 
 ## Important Notes
 
-The layout-aware parser result is measured on the current MVP dataset only.
+The layout-aware parser result is measured on the same MVP development benchmark used for parser development and error analysis.
 
-It should be interpreted as a strong candidate result, not production-level generalization.
+It is not a held-out test result and should not be interpreted as production-level generalization.
 
 The next validation step is to test the layout-aware parser on a larger and more diverse receipt dataset.
 

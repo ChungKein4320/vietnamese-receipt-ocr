@@ -11,7 +11,9 @@ data/evaluation/evaluation_report.csv
 data/evaluation/evaluation_summary.json
 ```
 
-## Current Evaluation Summary
+## Current Development Evaluation Summary
+
+This analysis uses the same 15 receipts used during parser development. The figures are development metrics, not held-out test estimates.
 
 - Number of receipts: `15`
 - Overall accuracy: `92.22%`
@@ -72,7 +74,7 @@ _No parser warnings found in the current evaluation report._
 
 ### Strongest field
 
-`payment_method` and `items_count` currently have no errors on the MVP dataset. `total_amount` is also strong after improving Vietnamese money normalization for formats such as `70.000d`, `80.000d`, `20.000d`, and `CASH(VND)-88000`.
+`payment_method` and `items_count` currently have no errors on the MVP development benchmark. `total_amount` is also strong after improving Vietnamese money normalization for formats such as `70.000d`, `80.000d`, `20.000d`, and `CASH(VND)-88000`.
 
 ### Weakest field
 
@@ -80,7 +82,7 @@ _No parser warnings found in the current evaluation report._
 
 ### Item extraction
 
-`items_count` is correct on the current MVP dataset, but full item-field extraction is still harder for the text-based parser because item names, quantities, unit prices, and line totals are often split across multiple OCR lines. A pure text-based parser has limited layout awareness.
+`items_count` is correct on the current MVP development benchmark, but full item-field extraction is still harder for the text-based parser because item names, quantities, unit prices, and line totals are often split across multiple OCR lines. A pure text-based parser has limited layout awareness.
 
 ### Payment method
 

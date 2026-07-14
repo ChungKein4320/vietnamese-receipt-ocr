@@ -6,6 +6,8 @@ Evaluate an experimental item parser that uses OCR layout rows generated from Pa
 
 This experiment does not replace the main `rule_based_v0.3` parser.
 
+The experiment uses the same 15-receipt / 39-item MVP development benchmark used for parser development and error analysis. It is not a held-out test.
+
 ## Summary
 
 - Number of receipts: `15`
@@ -37,3 +39,4 @@ _No rows._
 - It is expected to perform better on name/value row pairs.
 - It may still fail on highly irregular rows, merged cells, promotion rows, or OCR value corruption.
 - The main parser remains `rule_based_v0.3` until this experiment outperforms it consistently.
+- Item rows are compared at the same order index; names pass at normalized similarity `>= 0.75`, and numeric fields use exact equality after normalization.
