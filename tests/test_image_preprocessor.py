@@ -10,6 +10,7 @@ from receipt_ocr.image_preprocessor import (
     preprocess_image,
     preprocess_image_file,
     resize_if_large,
+    save_image,
     to_grayscale,
 )
 
@@ -76,9 +77,9 @@ def test_preprocess_image_default_returns_grayscale() -> None:
 
 
 def test_preprocess_image_file_writes_output(tmp_path) -> None:
-    input_path = tmp_path / "receipt.png"
-    output_path = tmp_path / "receipt_preprocessed.png"
-    cv2.imwrite(str(input_path), make_test_image())
+    input_path = tmp_path / "hóa đơn.png"
+    output_path = tmp_path / "hóa đơn processed.png"
+    save_image(make_test_image(), input_path)
 
     saved_path = preprocess_image_file(input_path, output_path=output_path)
 

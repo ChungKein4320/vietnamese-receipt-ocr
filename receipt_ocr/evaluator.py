@@ -24,6 +24,16 @@ def load_json(path: str | Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def load_receipt_payload(path: Path, receipt_id: str) -> dict[str, Any]:
+    payload = load_json(path)
+    if not isinstance(payload, dict) or payload.get("receipt_id") != receipt_id:
+        raise ValueError(f"Receipt ID mismatch for {path.name} (expected '{receipt_id}').")
+    items = payload.get("items")
+    if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
+        raise ValueError(f"Expected a list of item objects in {path.name}.")
+    return payload
+
+
 def normalize_string(value: Any) -> str | None:
     """
     Normalize a string for comparison.

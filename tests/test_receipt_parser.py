@@ -12,7 +12,7 @@ from receipt_ocr.receipt_parser import (
 SAMPLE_RECEIPT_LINES = [
     "WINMART+",
     "Hoa don ban le",
-    "Ngay: 15/08/2020 10:28",
+    "Ngay: 14/02/2031 09:42",
     "So: HD12345",
     "Ten hang",
     "SUA TUOI VINAMILK",
@@ -27,7 +27,7 @@ SAMPLE_RECEIPT_LINES = [
 
 def test_extract_core_receipt_fields_from_lines():
     assert extract_store_name(SAMPLE_RECEIPT_LINES) == "WINMART+"
-    assert extract_datetime(SAMPLE_RECEIPT_LINES) == "2020-08-15 10:28"
+    assert extract_datetime(SAMPLE_RECEIPT_LINES) == "2031-02-14 09:42"
     assert extract_invoice_id(SAMPLE_RECEIPT_LINES) == "12345"
     assert extract_total_amount(SAMPLE_RECEIPT_LINES) == 30000
     assert extract_payment_method(SAMPLE_RECEIPT_LINES) == "cash"
@@ -53,7 +53,7 @@ def test_parse_receipt_text_returns_structured_result_without_warnings():
     assert result.receipt_id == "receipt_test_001"
     assert result.source_ocr_path == "data/ocr_outputs/receipt_test_001_ocr.txt"
     assert result.store_name == "WINMART+"
-    assert result.datetime == "2020-08-15 10:28"
+    assert result.datetime == "2031-02-14 09:42"
     assert result.invoice_id == "12345"
     assert result.total_amount == 30000
     assert result.payment_method == "cash"

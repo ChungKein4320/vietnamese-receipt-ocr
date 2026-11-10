@@ -143,14 +143,14 @@ def normalize_datetime_value(text: str) -> str | None:
     Extract and normalize datetime from OCR text.
 
     Supported examples:
-        15/08/2020 10:28 -> 2020-08-15 10:28
-        15-08-2020 10:28 -> 2020-08-15 10:28
-        2020-08-15 10:28 -> 2020-08-15 10:28
+        14/02/2031 09:42 -> 2031-02-14 09:42
+        14-02-2031 09:42 -> 2031-02-14 09:42
+        2031-02-14 09:42 -> 2031-02-14 09:42
     """
     patterns = [
         # Check ISO-like year-first dates before day-first dates.
-        # Otherwise "2020-08-15 10:28" can be partially matched as
-        # "20-08-15 10:28" and incorrectly normalized to 2015-08-20.
+        # Otherwise "2031-02-14 09:42" can be partially matched as
+        # "31-02-14 09:42" and incorrectly normalized to 2014-02-31.
         re.compile(
             r"(?P<year>\d{4})[\/\-.](?P<month>\d{1,2})[\/\-.](?P<day>\d{1,2})"
             r"\s+(?P<hour>\d{1,2})[:hH](?P<minute>\d{2})"

@@ -22,13 +22,12 @@ from receipt_ocr.dataset_manifest import (
 )
 from receipt_ocr.evaluator import (
     evaluate_single_receipt,
-    load_json,
+    load_receipt_payload,
     summarize_evaluation,
 )
 
 
-def prediction_path_for(ground_truth_path: Path) -> Path:
-    receipt_id = ground_truth_path.stem
+def prediction_path_for(receipt_id: str) -> Path:
     return EXTRACTED_RESULT_DIR / f"{receipt_id}_extracted.json"
 
 
@@ -131,10 +130,7 @@ def main() -> None:
             )
 
     split_output_dir = evaluation_output_dir(args.split, args.receipt_id)
-    split_output_dir.mkdir(parents=True, exist_ok=True)
-
     rows = []
-    missing_predictions = []
 
     for record in records:
         ground_truth_path = PROJECT_ROOT / record.ground_truth_path
@@ -142,14 +138,12 @@ def main() -> None:
         if not ground_truth_path.exists():
             raise FileNotFoundError(f"Ground truth not found: {ground_truth_path}")
 
-        prediction_path = prediction_path_for(ground_truth_path)
+        prediction_path = prediction_path_for(record.receipt_id)
+        if not prediction_path.is_file():
+            parser.error(f"Missing prediction for '{record.receipt_id}' in split '{args.split}'.")
 
-        if not prediction_path.exists():
-            missing_predictions.append(str(prediction_path))
-            continue
-
-        ground_truth = load_json(ground_truth_path)
-        prediction = load_json(prediction_path)
+        ground_truth = load_receipt_payload(ground_truth_path, record.receipt_id)
+        prediction = load_receipt_payload(prediction_path, record.receipt_id)
 
         row = evaluate_single_receipt(
             ground_truth=ground_truth,
@@ -158,22 +152,13 @@ def main() -> None:
 
         rows.append(row)
 
-    if missing_predictions:
-        print("\nMissing prediction files:")
-        for path in missing_predictions:
-            print(f"- {path}")
-
-    if not rows:
-        raise FileNotFoundError(
-            f"No predictions available for split '{args.split}'."
-        )
-
     summary = summarize_evaluation(rows)
     summary["split"] = args.split
 
     csv_output_path = split_output_dir / "evaluation_report.csv"
     json_output_path = split_output_dir / "evaluation_summary.json"
 
+    split_output_dir.mkdir(parents=True, exist_ok=True)
     write_csv_report(rows, csv_output_path)
 
     json_output_path.write_text(

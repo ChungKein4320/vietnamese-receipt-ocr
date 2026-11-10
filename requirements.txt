@@ -1,9 +1,10 @@
-streamlit
+streamlit==1.57.0
 opencv-python==4.6.0.66
+# pdf2docx pulls the headless build, which shares the same cv2 namespace.
+opencv-python-headless==4.6.0.66
 pillow
 pandas
 numpy==1.26.4
 paddlepaddle==2.6.2
 paddleocr==2.7.3
-python-dotenv
 pytest

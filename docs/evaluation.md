@@ -17,15 +17,15 @@ Current development benchmark:
 
 These receipts were used during parser development and error analysis. The results below are therefore development-set results, not held-out test results. The dataset is intentionally small and is not a production-scale benchmark.
 
-The full 15-receipt dataset, predictions, and generated evaluation summaries are private and ignored by Git. A fresh public checkout contains one anonymized sample for a smoke test, but it cannot reproduce the aggregate metrics below. The reported metrics are documented snapshots of the local development experiment.
+The full 15-receipt dataset, predictions, and generated evaluation summaries are private and ignored by Git. A fresh public checkout contains a synthetic receipt for a standalone smoke test. The fixture is outside both benchmark splits. The aggregate scores below were reproduced locally from archived predictions and from a fresh CPU OCR run on the full private benchmark.
 
 ## Metric Semantics
 
 - Receipt-field accuracy is the proportion of correct field decisions across six fields. Store names pass at normalized similarity `>= 0.75`; invoice IDs pass on exact normalized match or similarity `>= 0.85`; datetime can pass when the date matches even if time does not.
 - Item rows are aligned by receipt order, not by an assignment or detection-matching algorithm.
 - Item names pass at normalized similarity `>= 0.75`.
-- Quantity, unit price, and line total use exact equality after number normalization.
-- Overall item-field accuracy is the unweighted mean of name, quantity, unit-price, and line-total accuracies. Item-count accuracy is reported separately.
+- Quantity, unit price, and line total match when the absolute difference is below `1e-6` after number normalization. Two missing normalized numbers also match.
+- Overall item-field accuracy is the unweighted mean of name, quantity, unit-price, and line-total accuracies. Item-count accuracy measures exact row-count agreement per receipt. Extra predictions affect count accuracy, while item-field accuracy uses the labeled item rows as its denominator.
 
 ## Current Parser Versions
 
@@ -138,7 +138,7 @@ This result is measured on the same 15 receipts / 39 items used for development 
 
 ## Reproduce Evaluation
 
-The commands below reproduce the evaluation only when the private local development images, labels, and predictions are present. From a public checkout, use the tracked sample to smoke-test the pipeline instead; the published aggregate metrics are not independently reproducible yet.
+The commands below use the private manifest, images, and labels. The evaluators require a prediction with the matching receipt ID for every selected record and stop before writing reports if an input is missing or mismatched. Use the tracked sample to smoke-test the pipeline from a public checkout.
 
 Run the full receipt-level pipeline:
 

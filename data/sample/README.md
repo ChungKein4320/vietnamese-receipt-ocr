@@ -1,35 +1,14 @@
-# Sample Reproducible Data
+# Synthetic Demo Receipt
 
-This folder contains a small public sample that makes the repository easier to inspect without requiring the full local dataset.
+This receipt was drawn for the public demo. The store, transaction, date, and purchases are fictional. The fixture is separate from the private 15-receipt development benchmark and from any held-out data.
 
-The sample is based on `receipt_001` from the MVP development benchmark.
-
-## Files
-
-| File | Description |
+| File | Contents |
 | --- | --- |
-| `receipt_001.png` | Sample receipt image used for the demo pipeline. |
-| `receipt_001_ocr.txt` | OCR text output generated from the sample receipt. |
-| `receipt_001_ocr.json` | OCR output with text confidence scores and bounding boxes. |
-| `receipt_001_ground_truth.json` | Manually created ground-truth labels for the sample receipt. |
-| `receipt_001_extracted.json` | Default parser output using `rule_based_v0.3`. |
-| `receipt_001_layout_extracted.json` | Layout-aware item parser candidate output. |
+| `synthetic_receipt.png` | Rendered receipt marked **Synthetic Demo Receipt** |
+| `synthetic_receipt_ocr.txt` | Text recognized by PaddleOCR |
+| `synthetic_receipt_ocr.json` | Recognized text, confidence scores, and four-point bounding boxes |
+| `synthetic_receipt_ground_truth.json` | Expected fields and items transcribed from the fixture design |
+| `synthetic_receipt_extracted.json` | Output from the default text parser |
+| `synthetic_receipt_layout_extracted.json` | Output from the layout-aware item candidate |
 
-## What this sample is for
-
-Use this folder to quickly understand the project data flow:
-
-```text
-receipt image
-→ OCR text / OCR boxes
-→ structured extraction JSON
-→ ground-truth comparison
-```
-
-The full private MVP development benchmark contains 15 receipts and 39 item rows. This folder includes only one sample to keep the public repository lightweight and easy to review.
-
-## Notes
-
-* The sample output files are provided as reproducible artifacts for portfolio review.
-* The metrics in the main README are development results from the full 15-receipt benchmark, not results from this single sample or a held-out test.
-* Some OCR text is imperfect because it reflects real OCR behavior on Vietnamese receipts.
+Upload the image in Streamlit to try both parser modes, SQLite, and the JSON/CSV downloads. The saved OCR artifacts were produced on CPU with PaddleOCR 2.7.3, PaddlePaddle 2.6.2, and the English recognition baseline. The README screenshots were captured using this image and an empty demo database.

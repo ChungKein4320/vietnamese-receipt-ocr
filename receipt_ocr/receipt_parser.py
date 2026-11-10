@@ -205,14 +205,7 @@ def _normalize_item_matching_text(line: str) -> str:
 
 
 def _looks_like_receipt_metadata_code(line: str) -> bool:
-    """
-    Detect receipt code lines that may look like item names.
-
-    Examples:
-        So:SON55296
-        S6SON55598
-        H00133765
-    """
+    """Identify labeled codes and numeric metadata that are not item names."""
     normalized = _normalize_item_matching_text(line)
     compact = re.sub(r"[^A-Z0-9]", "", normalized)
 
@@ -713,15 +706,7 @@ def _is_contact_or_phone_line(line: str) -> bool:
 
 
 def _normalize_invoice_id_candidate(candidate: str, context_line: str = "") -> str | None:
-    """
-    Normalize common OCR mistakes in invoice ID candidates.
-
-    Examples:
-        S6-32              -> SO-32
-        s6-31              -> SO-31
-        S6SON55598         -> SON55598
-        SHD:19810000682020 -> I9810000682020
-    """
+    """Normalize invoice codes after OCR confuses letters and digits in prefixes."""
     if not candidate:
         return None
 
@@ -750,17 +735,16 @@ def _normalize_invoice_id_candidate(candidate: str, context_line: str = "") -> s
     if not value:
         return None
 
-    # S6-32 / S0-32 / SO-32 -> SO-32
+    # Normalize short SO-style codes whose prefix can contain a misread letter.
     value = re.sub(r"^S[60O]-?(\d{1,6})$", r"SO-\1", value, flags=re.IGNORECASE)
 
-    # S6SON55598 / S0SON55598 -> SON55598
+    # Remove a misread leading label from SON-style codes.
     value = re.sub(r"^S[60O](SON\d{4,})$", r"\1", value, flags=re.IGNORECASE)
 
     # Normalize lowercase.
     value = value.upper()
 
-    # SHD line sometimes OCRs I981... as 1981...
-    # Example: SHD:19810000682020 -> I9810000682020
+    # In a long SHD code, OCR can read a leading letter I as the digit 1.
     context_normalized = normalize_for_matching(context_line)
 
     if "SHD" in context_normalized and re.fullmatch(r"1\d{10,}", value):
@@ -822,12 +806,7 @@ def _has_invoice_label(line: str) -> bool:
 
 
 def _extract_invoice_from_labeled_line(line: str) -> str | None:
-    """
-    Extract invoice ID from lines that contain labels such as:
-        So:2003000468
-        So hoa don
-        SHD:19810000682020
-    """
+    """Extract the invoice ID that follows an explicit receipt label."""
     if _is_contact_or_phone_line(line):
         return None
 
@@ -865,19 +844,19 @@ def _extract_direct_invoice_candidate(line: str, allow_bare_number: bool = False
         return None
 
     direct_patterns = [
-        # BL.200814.1.00046
+        # Long invoice code with a leading letter.
         r"\bBL[.\-]\d{6}[A-Za-z0-9.\-]*\b",
 
-        # SO-32, S6-32, s6-31
+        # Short SO-style code.
         r"\bS[O06]-\d{1,6}\b",
 
-        # SON55296, S6SON55598
+        # SON-style code with an optional misread label.
         r"\bS[O06]?SON\d{4,}\b",
 
-        # H00133765, HD00197593
+        # HD-style code.
         r"\bHD?\d{5,}\b",
 
-        # I00022-550301, I9810000682020
+        # Dotted numeric codes.
         r"\bI\d{4,}(?:-\d+)?\b",
     ]
 
@@ -1850,18 +1829,19 @@ def extract_items(lines: list[str]) -> list[ReceiptItem]:
         for lookahead_index in range(index + 1, min(index + 8, len(section_lines))):
             lookahead_line = section_lines[lookahead_index]
 
-            if is_probable_barcode(lookahead_line):
+            money_values = find_money_values(lookahead_line)
+            if is_probable_barcode(lookahead_line) and len(money_values) < 2:
                 consumed_until = lookahead_index
                 continue
 
             if _is_item_name_candidate(lookahead_line):
                 break
 
-            money_values = find_money_values(lookahead_line)
-
             if money_values:
                 if unit_price is None:
                     unit_price = money_values[0]
+                    if len(money_values) >= 2:
+                        line_total = money_values[-1]
                 elif line_total is None:
                     line_total = money_values[-1]
 

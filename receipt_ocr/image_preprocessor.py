@@ -11,38 +11,30 @@ from receipt_ocr.config import PROCESSED_IMAGE_DIR
 ImageArray = np.ndarray
 
 
-def load_image(image_path: str | Path) -> ImageArray:
-    """
-    Load an image from disk using OpenCV.
-
-    OpenCV reads images in BGR format. This function keeps the BGR format because
-    the rest of the preprocessing utilities use OpenCV operations directly.
-    """
-    image_path = Path(image_path)
-
-    if not image_path.exists():
-        raise FileNotFoundError(f"Image file not found: {image_path}")
-
-    image = cv2.imread(str(image_path))
-
+def decode_image(image_bytes: bytes) -> ImageArray:
+    """Decode a color image in OpenCV's BGR channel order."""
+    if not image_bytes:
+        raise ValueError("The receipt image is empty.")
+    image = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
     if image is None:
-        raise ValueError(f"Unable to read image file: {image_path}")
-
+        raise ValueError("Could not decode the receipt image.")
     return image
 
 
+def load_image(image_path: str | Path) -> ImageArray:
+    """Load an image in BGR order from a filesystem path."""
+    return decode_image(Path(image_path).read_bytes())
+
+
 def save_image(image: ImageArray, output_path: str | Path) -> Path:
-    """
-    Save an image to disk and return the output path.
-    """
+    """Save an image to disk and return the output path."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    success = cv2.imwrite(str(output_path), image)
-
+    success, encoded = cv2.imencode(output_path.suffix, image)
     if not success:
-        raise ValueError(f"Unable to save image to: {output_path}")
+        raise ValueError(f"Unable to encode image for: {output_path}")
 
+    output_path.write_bytes(encoded.tobytes())
     return output_path
 
 

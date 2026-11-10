@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
-from receipt_ocr.config import DATABASE_DIR, DATABASE_PATH
+from receipt_ocr.config import DATABASE_PATH
 
 
 def get_connection(db_path: str | Path = DATABASE_PATH) -> sqlite3.Connection:
@@ -26,7 +27,7 @@ def init_database(db_path: str | Path = DATABASE_PATH) -> None:
     """
     Initialize SQLite database tables.
     """
-    with get_connection(db_path) as connection:
+    with closing(get_connection(db_path)) as connection, connection:
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS receipts (
@@ -110,20 +111,25 @@ def save_extraction_to_db(
     result_dict = _as_result_dict(result)
     receipt_id = result_dict["receipt_id"]
 
-    with get_connection(db_path) as connection:
-        if replace:
-            existing = connection.execute(
-                "SELECT id FROM receipts WHERE receipt_id = ?;",
-                (receipt_id,),
-            ).fetchone()
+    conflict_clause = """
+        ON CONFLICT(receipt_id) DO UPDATE SET
+            source_ocr_path = excluded.source_ocr_path,
+            store_name = excluded.store_name,
+            datetime = excluded.datetime,
+            invoice_id = excluded.invoice_id,
+            vat = excluded.vat,
+            service_fee = excluded.service_fee,
+            total_amount = excluded.total_amount,
+            payment_method = excluded.payment_method,
+            num_ocr_lines = excluded.num_ocr_lines,
+            parser_version = excluded.parser_version,
+            warnings_json = excluded.warnings_json,
+            raw_json = excluded.raw_json,
+            updated_at = CURRENT_TIMESTAMP
+    """ if replace else ""
 
-            if existing is not None:
-                connection.execute(
-                    "DELETE FROM receipts WHERE id = ?;",
-                    (existing["id"],),
-                )
-
-        cursor = connection.execute(
+    with closing(get_connection(db_path)) as connection, connection:
+        connection.execute(
             """
             INSERT INTO receipts (
                 receipt_id,
@@ -140,8 +146,8 @@ def save_extraction_to_db(
                 warnings_json,
                 raw_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-            """,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """ + conflict_clause,
             (
                 result_dict.get("receipt_id"),
                 result_dict.get("source_ocr_path"),
@@ -159,7 +165,15 @@ def save_extraction_to_db(
             ),
         )
 
-        receipt_db_id = int(cursor.lastrowid)
+        receipt_db_id = connection.execute(
+            "SELECT id FROM receipts WHERE receipt_id = ?;",
+            (receipt_id,),
+        ).fetchone()["id"]
+        if replace:
+            connection.execute(
+                "DELETE FROM receipt_items WHERE receipt_db_id = ?;",
+                (receipt_db_id,),
+            )
 
         for item_index, item in enumerate(result_dict.get("items", []), start=1):
             connection.execute(
@@ -193,7 +207,7 @@ def fetch_all_receipts(db_path: str | Path = DATABASE_PATH) -> list[dict[str, An
     """
     init_database(db_path)
 
-    with get_connection(db_path) as connection:
+    with closing(get_connection(db_path)) as connection:
         rows = connection.execute(
             """
             SELECT
@@ -225,7 +239,7 @@ def fetch_items_for_receipt(
     """
     init_database(db_path)
 
-    with get_connection(db_path) as connection:
+    with closing(get_connection(db_path)) as connection:
         rows = connection.execute(
             """
             SELECT
@@ -250,7 +264,7 @@ def fetch_all_items(db_path: str | Path = DATABASE_PATH) -> list[dict[str, Any]]
     """
     init_database(db_path)
 
-    with get_connection(db_path) as connection:
+    with closing(get_connection(db_path)) as connection:
         rows = connection.execute(
             """
             SELECT
@@ -278,7 +292,7 @@ def count_receipts(db_path: str | Path = DATABASE_PATH) -> int:
     """
     init_database(db_path)
 
-    with get_connection(db_path) as connection:
+    with closing(get_connection(db_path)) as connection:
         row = connection.execute("SELECT COUNT(*) AS count FROM receipts;").fetchone()
 
     return int(row["count"])

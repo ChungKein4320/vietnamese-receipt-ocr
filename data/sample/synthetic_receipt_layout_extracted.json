@@ -1,0 +1,31 @@
+{
+  "receipt_id": "synthetic_receipt",
+  "source_ocr_path": "data/sample/synthetic_receipt_ocr.txt",
+  "store_name": "MAY GIAY COFFEE",
+  "datetime": "2031-02-14 09:42",
+  "invoice_id": "DEMO-731406",
+  "items": [
+    {
+      "name": "CA PHE SUA",
+      "quantity": 2,
+      "unit_price": 32000,
+      "line_total": 64000
+    },
+    {
+      "name": "TRA DAO",
+      "quantity": 1,
+      "unit_price": 27000,
+      "line_total": 27000
+    }
+  ],
+  "vat": null,
+  "service_fee": null,
+  "total_amount": 91000,
+  "payment_method": "cash",
+  "num_ocr_lines": 20,
+  "parser_version": "rule_based_v0.3+layout_aware_item_v0.4_candidate",
+  "warnings": [],
+  "original_parser_version": "rule_based_v0.3",
+  "item_parser_version": "layout_aware_item_v0.4_candidate",
+  "item_parser_mode": "layout_aware_v0.4_candidate"
+}

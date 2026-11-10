@@ -35,7 +35,7 @@ data/ground_truth/        # manual JSON annotations
 data/processed/images/    # preprocessed images
 data/ocr_outputs/         # OCR raw text outputs
 data/extracted_results/   # extracted JSON outputs
-data/sample/              # anonymized demo data
+data/sample/              # tracked synthetic demo data
 ```
 
 ## File Naming Convention
@@ -82,15 +82,15 @@ The image and ground truth file must share the same ID.
 
 ## Ground Truth Schema
 
-Each receipt image has one manually created JSON annotation.
+Each receipt image has one manually created JSON annotation. The example below uses fictional values.
 
 ```json
 {
   "receipt_id": "receipt_001",
   "image_path": "data/raw/receipts/receipt_001.png",
   "store_name": "Example Store",
-  "datetime": "2020-08-15 10:28",
-  "invoice_id": "HD001234",
+  "datetime": "2031-02-14 09:42",
+  "invoice_id": "DEMO-731406",
   "items": [
     {
       "name": "Example item",
@@ -162,7 +162,7 @@ Validate the private manifest structure:
 python scripts/validate_dataset_manifest.py --check-files
 ```
 
-The validator rejects legacy `test` labels, duplicate receipt IDs, unsafe paths, missing required columns, and optionally missing referenced files. A valid manifest with zero `held_out` rows is acceptable and means that no held-out result is available yet.
+The validator rejects legacy `test` labels, duplicate receipt IDs or paths, unsafe paths, and missing required columns. With `--check-files` it also rejects missing files and byte-identical images assigned to both splits. A valid manifest with zero `held_out` rows is acceptable and means that no held-out result is available yet. The public synthetic receipt is a smoke-test fixture outside the manifests used for evaluation.
 
 ## Git Tracking Rules
 

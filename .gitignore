@@ -25,6 +25,8 @@ data/processed/images/*
 data/ocr_outputs/*
 data/extracted_results/*
 database/*.db
+/database/*.db-*
+/database/*.sqlite*
 data/ground_truth/*
 data/dataset_manifest.csv
 data/evaluation/*
@@ -50,6 +52,8 @@ data/layout_extracted_results/*
 
 # Environment
 .env
+.env.*
+!.env.example
 
 # Streamlit local temp files
 .tmp_streamlit/

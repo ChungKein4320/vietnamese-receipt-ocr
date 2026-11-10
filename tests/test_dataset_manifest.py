@@ -164,3 +164,29 @@ def test_records_for_split_rejects_empty_split() -> None:
 
     with pytest.raises(ManifestValidationError, match="No records found"):
         records_for_split([development], "held_out")
+
+def test_manifest_rejects_alias_of_image_path(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.csv"
+    _write_manifest(
+        manifest,
+        [
+            "one,development,data/image.png,data/one.json\n",
+            "two,held_out,data/./image.png,data/two.json\n",
+        ],
+    )
+    with pytest.raises(ManifestValidationError, match="duplicate image_path"):
+        load_dataset_manifest(manifest, project_root=tmp_path)
+
+
+def test_manifest_rejects_exact_image_copies_across_splits(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.csv"
+    for name in ("dev.png", "test.png"):
+        (tmp_path / name).write_bytes(b"same image")
+    for name in ("dev.json", "test.json"):
+        (tmp_path / name).touch()
+    _write_manifest(
+        manifest,
+        ["one,development,dev.png,dev.json\n", "two,held_out,test.png,test.json\n"],
+    )
+    with pytest.raises(ManifestValidationError, match="identical image"):
+        load_dataset_manifest(manifest, project_root=tmp_path, check_files=True)

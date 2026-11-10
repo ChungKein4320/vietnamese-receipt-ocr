@@ -14,11 +14,11 @@ conda activate receipt-ocr
 Install dependencies:
 
 ```powershell
-pip install --upgrade pip setuptools wheel
-pip install -r requirements.txt
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
 ```
 
-Verify PaddleOCR:
+The CPU demo uses PaddleOCR 2.7.3 and PaddlePaddle 2.6.2. The first OCR run may need network access to download the model weights. Verify the Python imports before running the app:
 
 ```powershell
 python -c "import paddle; print('paddle:', paddle.__version__)"
@@ -33,10 +33,12 @@ python -m pytest -q
 
 ## Dataset Manifest
 
-Copy the tracked example and add only data that you are authorized to use:
+For a new local benchmark, copy the template if a private manifest does not already exist. Replace the example row with authorized local receipts:
 
 ```powershell
-Copy-Item data/dataset_manifest.example.csv data/dataset_manifest.csv
+if (-not (Test-Path data/dataset_manifest.csv)) {
+    Copy-Item data/dataset_manifest.example.csv data/dataset_manifest.csv
+}
 ```
 
 Validate IDs, split labels, safe paths, and referenced files:
@@ -169,10 +171,12 @@ This experiment improved average text similarity on the development benchmark bu
 Start the local app:
 
 ```powershell
-streamlit run app/streamlit_app.py
+python -m streamlit run app/streamlit_app.py --server.address 127.0.0.1
 ```
 
-The sidebar supports the stable text parser and the layout-aware candidate. The app can preview OCR, structured fields, item rows, raw JSON, save records to SQLite, and export JSON/CSV.
+Upload the standalone synthetic receipt at `data/sample/synthetic_receipt.png` to preview an image and run OCR with either item parser. The app reuses the OCR lines when you switch parsers. If the layout parser fails or finds no items where the text parser found some, the app displays the text parser's result with a warning.
+
+Save results from the **Database** tab and download UTF-8 JSON or an item CSV from **Download**. Each upload ID is derived from the file bytes, so saving the same image again updates its record. Records created by older demo versions keep their filename-based IDs. Uploads are decoded in memory. Saved results are stored in the local SQLite database.
 
 ## SQLite and Export
 
@@ -208,4 +212,4 @@ The report documents field-level failures and recommended parser improvements. S
 
 ## Local-only Data
 
-Receipt images, annotations, generated OCR, predictions, evaluation artifacts, SQLite databases, and temporary debug files are ignored by Git unless explicitly provided as anonymized samples. Do not commit private receipts or personally identifying information.
+Receipt images, annotations, generated OCR, predictions, evaluation artifacts, SQLite databases, and temporary debug files in the designated local directories are ignored by Git. Do not commit private receipts or personally identifying information.

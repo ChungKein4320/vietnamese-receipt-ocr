@@ -35,7 +35,7 @@ _No rows._
 
 - This evaluator checks the production-like layout-aware JSON outputs.
 - It does not evaluate receipt-level fields such as store name, datetime, invoice ID, total amount, or payment method.
-- Item rows are compared at the same order index; names pass at normalized similarity `>= 0.75`, and numeric fields use exact equality after normalization.
+- Item rows are compared at the same order index; names pass at normalized similarity `>= 0.75`, and numeric fields match within an absolute tolerance of less than `1e-6` after normalization.
 - Current layout-aware item parsing still depends on OCR layout CSV files generated from PaddleOCR bounding boxes.
 - The main parser remains `rule_based_v0.3` until the layout-aware parser is fully integrated into the OCR pipeline.
 - The private development inputs and generated evaluation artifacts are not committed, so this aggregate report cannot be regenerated from a fresh public checkout.

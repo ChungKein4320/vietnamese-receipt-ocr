@@ -31,32 +31,21 @@ This analysis uses the same 15 receipts used during parser development. The figu
 
 ## Field-level Error Details
 
-### store_name
+### Store name
 
-| receipt_id | ground_truth | prediction | score |
-| --- | --- | --- | --- |
-| receipt_005 | SCTC CÔ THỎ 104 TRẦN PHÚ - CẨM PHẢ | PHA | 0.171 |
-| receipt_013 | SCTC CÔ THỎ 104 TRẦN PHÚ - CẨM PHẢ | PHA | 0.171 |
-| receipt_014 | Tiệm ăn Thanh Xuân | Tim ita | 0.4 |
+Three receipts had incorrect store names. Two OCR headers collapsed into the same short fragment, and one prediction selected a different header line.
 
-### datetime
+### Datetime
 
-| receipt_id | ground_truth | prediction | score |
-| --- | --- | --- | --- |
-| receipt_013 | 2020-08-10 20:01 | 2020-03-10 20:01 | 0.0 |
+One error changed the month while retaining the day and time.
 
-### invoice_id
+### Invoice ID
 
-| receipt_id | ground_truth | prediction | score |
-| --- | --- | --- | --- |
-| receipt_013 | 2003000874 |  | 0.0 |
-| receipt_014 | I00022-550301 |  | 0.0 |
+The parser returned no invoice ID on two receipts. The detailed comparisons are kept with the local evaluation artifacts.
 
-### total_amount
+### Total amount
 
-| receipt_id | ground_truth | prediction | score |
-| --- | --- | --- | --- |
-| receipt_011 | 49000 | 67000 | 0.0 |
+On one receipt, the parser selected a larger amount than the annotated payable total.
 
 ### payment_method
 
@@ -78,7 +67,7 @@ _No parser warnings found in the current evaluation report._
 
 ### Weakest field
 
-`invoice_id` is currently the weakest field. Receipt IDs appear in many inconsistent formats and can be confused with phone numbers, cashier IDs, receipt titles, or transaction codes.
+Store name had the lowest accuracy. Invoice IDs were the next most error-prone field. Receipt IDs appear in many inconsistent formats and can be confused with phone numbers, cashier IDs, receipt titles, or transaction codes.
 
 ### Item extraction
 
@@ -96,7 +85,7 @@ Recommended priority order:
 2. Improve `invoice_id` extraction with stricter receipt-code patterns and better filtering against phone/cashier/order IDs.
 3. Validate the layout-aware item parser on more receipt layouts beyond the current MVP set.
 4. Add confidence-based warnings for suspicious predictions.
-5. Add a small reproducible sample dataset for GitHub users.
+5. Maintain a standalone synthetic receipt for public smoke testing.
 6. Keep unit tests for normalizer and parser utilities up to date.
 
 ## Next Step

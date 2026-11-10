@@ -494,7 +494,7 @@ def normalize_layout_item_values(item: LayoutParsedItem) -> LayoutParsedItem:
             if inferred_unit_price >= 1000:
                 unit_price = inferred_unit_price
 
-        elif unit_price == line_total:
+        elif unit_price == line_total and quantity is None:
             quantity = 1
 
     return LayoutParsedItem(

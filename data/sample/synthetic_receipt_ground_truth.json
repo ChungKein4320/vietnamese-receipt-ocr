@@ -1,0 +1,25 @@
+{
+  "receipt_id": "synthetic_receipt",
+  "image_path": "data/sample/synthetic_receipt.png",
+  "store_name": "MAY GIAY COFFEE",
+  "datetime": "2031-02-14 09:42",
+  "invoice_id": "DEMO-731406",
+  "payment_method": "cash",
+  "total_amount": 91000,
+  "vat": null,
+  "service_fee": null,
+  "items": [
+    {
+      "name": "CA PHE SUA",
+      "quantity": 2,
+      "unit_price": 32000,
+      "line_total": 64000
+    },
+    {
+      "name": "TRA DAO",
+      "quantity": 1,
+      "unit_price": 27000,
+      "line_total": 27000
+    }
+  ]
+}

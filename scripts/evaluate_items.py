@@ -26,13 +26,7 @@ from receipt_ocr.dataset_manifest import (
     load_dataset_manifest,
     records_for_split,
 )
-
-
-def load_json(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        raise FileNotFoundError(f"File not found: {path}")
-
-    return json.loads(path.read_text(encoding="utf-8"))
+from receipt_ocr.evaluator import load_receipt_payload
 
 
 def normalize_text(value: Any) -> str:
@@ -139,8 +133,8 @@ def evaluate_receipt_items(
     gt_path = ground_truth_path or GROUND_TRUTH_DIR / f"{receipt_id}.json"
     pred_path = EXTRACTED_RESULT_DIR / f"{receipt_id}_extracted.json"
 
-    gt_payload = load_json(gt_path)
-    pred_payload = load_json(pred_path)
+    gt_payload = load_receipt_payload(gt_path, receipt_id)
+    pred_payload = load_receipt_payload(pred_path, receipt_id)
 
     gt_items = get_items(gt_payload)
     pred_items = get_items(pred_payload)
@@ -431,7 +425,6 @@ def main() -> None:
         parser.error(str(error))
 
     split_output_dir = EVALUATION_DIR / args.split
-    split_output_dir.mkdir(parents=True, exist_ok=True)
     item_report_csv = split_output_dir / "item_evaluation_report.csv"
     item_summary_json = split_output_dir / "item_evaluation_summary.json"
     item_analysis_md = split_output_dir / "item_evaluation.md"
@@ -442,9 +435,8 @@ def main() -> None:
         receipt_id = record.receipt_id
         pred_path = EXTRACTED_RESULT_DIR / f"{receipt_id}_extracted.json"
 
-        if not pred_path.exists():
-            print(f"Skipping {receipt_id}: prediction not found at {pred_path}")
-            continue
+        if not pred_path.is_file():
+            parser.error(f"Missing prediction for '{receipt_id}' in split '{args.split}'.")
 
         all_rows.extend(
             evaluate_receipt_items(
@@ -453,15 +445,11 @@ def main() -> None:
             )
         )
 
-    if not all_rows:
-        raise FileNotFoundError(
-            f"No predictions available for split '{args.split}'."
-        )
-
     report_df = pd.DataFrame(all_rows)
     summary = build_summary(report_df)
     summary["split"] = args.split
 
+    split_output_dir.mkdir(parents=True, exist_ok=True)
     report_df.to_csv(item_report_csv, index=False, encoding="utf-8-sig")
     item_summary_json.write_text(
         json.dumps(summary, ensure_ascii=False, indent=2),

@@ -3,9 +3,14 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from receipt_ocr.config import OCR_OUTPUT_DIR
+from receipt_ocr.image_preprocessor import decode_image
+
+
+_OCR_LOCK = Lock()
 
 
 @lru_cache(maxsize=2)
@@ -26,6 +31,7 @@ def get_ocr_engine(lang: str = "en"):
 
     return PaddleOCR(
         use_angle_cls=True,
+        use_gpu=False,
         lang=lang,
         show_log=False,
     )
@@ -50,7 +56,8 @@ def _is_ocr_line(obj: Any) -> bool:
     if len(text_score) != 2:
         return False
 
-    return True
+    # A page with exactly two detections can also be a list of length two.
+    return isinstance(text_score[0], str)
 
 
 def _flatten_paddle_result(raw_result: Any) -> list[Any]:
@@ -99,9 +106,9 @@ def _to_serializable_box(box: Any) -> list[list[float]]:
     return serializable_box
 
 
-def run_ocr(image_path: str | Path, lang: str = "en") -> list[dict[str, Any]]:
+def run_ocr(image_path: str | Path | bytes, lang: str = "en") -> list[dict[str, Any]]:
     """
-    Run OCR on one image and return normalized OCR lines.
+    Run OCR on one image path or encoded upload and return normalized OCR lines.
 
     Returns:
         [
@@ -112,13 +119,13 @@ def run_ocr(image_path: str | Path, lang: str = "en") -> list[dict[str, Any]]:
             }
         ]
     """
-    image_path = Path(image_path)
+    image_bytes = image_path if isinstance(image_path, bytes) else Path(image_path).read_bytes()
+    image = decode_image(image_bytes)
 
-    if not image_path.exists():
-        raise FileNotFoundError(f"Image not found: {image_path}")
-
-    ocr = get_ocr_engine(lang=lang)
-    raw_result = ocr.ocr(str(image_path), cls=True)
+    # The cached predictor can be shared by multiple Streamlit sessions.
+    with _OCR_LOCK:
+        ocr = get_ocr_engine(lang=lang)
+        raw_result = ocr.ocr(image, cls=True)
     raw_lines = _flatten_paddle_result(raw_result)
 
     normalized_lines = []

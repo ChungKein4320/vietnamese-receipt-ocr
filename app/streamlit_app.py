@@ -2,24 +2,26 @@ from __future__ import annotations
 
 import html
 import json
-import re
+import sqlite3
 import sys
+from hashlib import sha256
+from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageOps
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT))
 
-from receipt_ocr.database import count_receipts, fetch_all_receipts, save_extraction_to_db
+from receipt_ocr.database import fetch_all_receipts, save_extraction_to_db
+from receipt_ocr.exporter import ITEM_CSV_COLUMNS, records_to_csv_bytes
 from receipt_ocr.layout_item_parser import LayoutRow, parse_layout_items_from_rows
 from receipt_ocr.ocr_engine import ocr_lines_to_text, run_ocr
 from receipt_ocr.receipt_parser import parse_receipt_text
 
 
-TMP_UPLOAD_DIR = PROJECT_ROOT / ".tmp_streamlit"
 ITEM_PARSER_MODES = {
     "text_based_v0.3": "Text parser v0.3",
     "layout_aware_v0.4_candidate": "Layout parser v0.4",
@@ -511,30 +513,9 @@ def inject_custom_css() -> None:
     )
 
 
-def sanitize_receipt_id(file_name: str) -> str:
-    stem = Path(file_name).stem.lower()
-    stem = re.sub(r"[^a-z0-9]+", "_", stem)
-    stem = re.sub(r"_+", "_", stem).strip("_")
-
-    if not stem:
-        return "uploaded_receipt"
-
-    return stem
-
-
-def save_uploaded_file(uploaded_file) -> Path:
-    TMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-    receipt_id = sanitize_receipt_id(uploaded_file.name)
-    suffix = Path(uploaded_file.name).suffix.lower()
-
-    if suffix not in [".png", ".jpg", ".jpeg"]:
-        suffix = ".png"
-
-    output_path = TMP_UPLOAD_DIR / f"{receipt_id}{suffix}"
-    output_path.write_bytes(uploaded_file.getbuffer())
-
-    return output_path
+def decode_upload(image_bytes: bytes) -> Image.Image:
+    with Image.open(BytesIO(image_bytes), formats=("PNG", "JPEG")) as image:
+        return ImageOps.exif_transpose(image).convert("RGB")
 
 
 def result_to_json_bytes(result_dict: dict) -> bytes:
@@ -786,6 +767,10 @@ def apply_layout_aware_items(
         for item in layout_items
     ]
 
+    if updated_result["items"]:
+        updated_result["warnings"] = [
+            warning for warning in result_dict["warnings"] if warning != "items_not_found"
+        ]
     return updated_result
 
 
@@ -863,35 +848,35 @@ def render_pipeline_card() -> None:
     )
 
 
-def reset_state_for_new_upload(uploaded_file_name: str) -> None:
-    previous_file_name = st.session_state.get("uploaded_file_name")
-
-    if previous_file_name != uploaded_file_name:
-        st.session_state["uploaded_file_name"] = uploaded_file_name
+def reset_state_for_new_upload(receipt_id: str | None, lang: str) -> None:
+    input_key = (receipt_id, lang)
+    if st.session_state.get("ocr_input") != input_key:
+        st.session_state["ocr_input"] = input_key
         st.session_state.pop("ocr_lines", None)
-        st.session_state.pop("ocr_text", None)
-        st.session_state.pop("result_dict", None)
-        st.session_state.pop("items_df", None)
-        st.session_state.pop("image_path", None)
-        st.session_state.pop("receipt_id", None)
+        reset_result_state()
 
 
 def reset_result_state() -> None:
-    st.session_state.pop("ocr_lines", None)
     st.session_state.pop("ocr_text", None)
     st.session_state.pop("result_dict", None)
     st.session_state.pop("items_df", None)
 
 
 def run_pipeline(
-    image_path: Path,
+    image_bytes: bytes,
     receipt_id: str,
     lang: str,
     item_parser_mode: str,
 ) -> None:
     with st.status("Running OCR and information extraction...", expanded=True) as status:
-        st.write("Loading PaddleOCR model and reading receipt image...")
-        ocr_lines = run_ocr(image_path=image_path, lang=lang)
+        ocr_lines = st.session_state.get("ocr_lines")
+        if ocr_lines is None:
+            st.write("Loading PaddleOCR model and reading receipt image...")
+            ocr_lines = run_ocr(image_bytes, lang=lang)
+            if not ocr_lines:
+                status.update(label="No text detected. Try a clearer receipt image.", state="error")
+                return
+            st.session_state["ocr_lines"] = ocr_lines
 
         st.write("Converting OCR lines to raw text...")
         ocr_text = ocr_lines_to_text(ocr_lines)
@@ -900,7 +885,6 @@ def run_pipeline(
         extraction_result = parse_receipt_text(
             receipt_id=receipt_id,
             text=ocr_text,
-            source_ocr_path=image_path,
         )
 
         result_dict = extraction_result.to_dict()
@@ -910,28 +894,29 @@ def run_pipeline(
             st.write("Replacing item rows with layout-aware item parser output...")
 
             try:
-                result_dict = apply_layout_aware_items(
+                layout_result = apply_layout_aware_items(
                     result_dict=result_dict,
                     ocr_lines=ocr_lines,
                     receipt_id=receipt_id,
                 )
             except Exception as exc:
-                warnings = result_dict.get("warnings") or []
-                warnings.append(f"layout_item_parser_failed: {type(exc).__name__}")
-                result_dict["warnings"] = warnings
+                layout_result = None
+                result_dict["warnings"].append(f"layout_item_parser_failed: {type(exc).__name__}")
+
+            if layout_result is not None and not layout_result["items"] and result_dict["items"]:
+                layout_result = None
+                result_dict["warnings"].append("layout_items_not_found")
+
+            if layout_result is None:
                 result_dict["item_parser_version"] = "text_based_fallback"
                 result_dict["item_parser_mode"] = "text_based_v0.3"
-
-                st.warning(
-                    "Layout-aware item parser failed. "
-                    "Falling back to text-based parser v0.3."
-                )
+            else:
+                result_dict = layout_result
         else:
             result_dict["item_parser_version"] = "text_based_v0.3"
 
         items_df = items_to_dataframe(result_dict["items"])
 
-        st.session_state["ocr_lines"] = ocr_lines
         st.session_state["ocr_text"] = ocr_text
         st.session_state["result_dict"] = result_dict
         st.session_state["items_df"] = items_df
@@ -1007,7 +992,7 @@ def render_overview(result_dict: dict, items_df: pd.DataFrame) -> None:
                 items_df,
                 numeric_columns=ITEM_TABLE_NUMERIC_COLUMNS,
             ),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -1027,17 +1012,24 @@ def render_database_tab(result_dict: dict) -> None:
 
             if st.button(
                 "▶ Save to SQLite",
-                use_container_width=True,
+                width="stretch",
                 key="save_to_sqlite_button",
             ):
-                receipt_db_id = save_extraction_to_db(result_dict, replace=True)
-                st.success(f"Saved with database id={receipt_db_id}")
+                try:
+                    receipt_db_id = save_extraction_to_db(result_dict, replace=True)
+                except (OSError, sqlite3.Error):
+                    st.error("Could not save to SQLite. Check database access and retry.")
+                else:
+                    st.success(f"Saved with database id={receipt_db_id}")
 
-        st.metric("Saved receipts", count_receipts())
+        try:
+            saved_receipts = fetch_all_receipts()
+        except (OSError, sqlite3.Error):
+            st.error("Could not read the local SQLite database.")
+            return
+        st.metric("Saved receipts", len(saved_receipts))
 
     with right_col:
-        saved_receipts = fetch_all_receipts()
-
         if saved_receipts:
             saved_receipts_df = pd.DataFrame(saved_receipts)
 
@@ -1052,7 +1044,7 @@ def render_database_tab(result_dict: dict) -> None:
                     saved_receipts_df,
                     numeric_columns=DATABASE_TABLE_NUMERIC_COLUMNS,
                 ),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -1061,7 +1053,6 @@ def render_database_tab(result_dict: dict) -> None:
 
 def render_download_tab(
     result_dict: dict,
-    items_df: pd.DataFrame,
     receipt_id: str,
 ) -> None:
     st.markdown("#### 📥 Export current extraction")
@@ -1078,7 +1069,8 @@ def render_download_tab(
                 data=result_to_json_bytes(result_dict),
                 file_name=f"{receipt_id}_extracted.json",
                 mime="application/json",
-                use_container_width=True,
+                on_click="ignore",
+                width="stretch",
             )
 
     with col_b:
@@ -1086,14 +1078,15 @@ def render_download_tab(
             st.markdown("##### Items CSV")
             st.caption("Download the extracted item table as a spreadsheet.")
 
-            csv_bytes = items_df.to_csv(index=False).encode("utf-8-sig")
+            csv_bytes = records_to_csv_bytes(result_dict["items"], ITEM_CSV_COLUMNS)
 
             st.download_button(
                 label="⬇ Download CSV",
                 data=csv_bytes,
                 file_name=f"{receipt_id}_items.csv",
                 mime="text/csv",
-                use_container_width=True,
+                on_click="ignore",
+                width="stretch",
             )
 
 
@@ -1185,6 +1178,9 @@ def main() -> None:
 
     upload_col, pipeline_col = st.columns([1.15, 0.85], gap="large")
 
+    image_bytes = None
+    receipt_id = None
+
     with upload_col:
         with st.container(border=True):
             st.markdown("#### 📂 Upload receipt image")
@@ -1196,22 +1192,22 @@ def main() -> None:
             )
 
         if uploaded_file is not None:
-            reset_state_for_new_upload(uploaded_file.name)
+            try:
+                image = decode_upload(uploaded_file.getvalue())
+            except (OSError, ValueError, Image.DecompressionBombError):
+                st.error("Could not read this image. Upload a valid PNG or JPEG file.")
+            else:
+                image_bytes = uploaded_file.getvalue()
+                receipt_id = f"upload_{sha256(image_bytes).hexdigest()[:32]}"
 
-            image_path = save_uploaded_file(uploaded_file)
-            receipt_id = sanitize_receipt_id(uploaded_file.name)
-
-            st.session_state["image_path"] = image_path
-            st.session_state["receipt_id"] = receipt_id
-
-            image = Image.open(image_path)
-
+        reset_state_for_new_upload(receipt_id, lang)
+        if image_bytes is not None:
             with st.container(border=True):
                 st.markdown("#### 🖼️ Input preview")
                 st.image(
                     image,
                     caption=uploaded_file.name,
-                    use_container_width=True,
+                    width="stretch",
                 )
 
             with st.container(border=True):
@@ -1241,32 +1237,31 @@ def main() -> None:
             st.markdown("#### ⚡ Run extraction")
             st.caption(f"Item parser: {ITEM_PARSER_MODES[item_parser_mode]}")
 
-            if uploaded_file is None:
+            if receipt_id is None:
                 st.info("Upload a receipt image to enable the pipeline.")
                 run_button = False
             else:
                 st.caption("Current receipt")
                 st.markdown(
-                    f"**🗒️ {escape_html(st.session_state['receipt_id'])}**",
+                    f"**🗒️ {escape_html(uploaded_file.name)}**",
                     unsafe_allow_html=True,
                 )
 
                 run_button = st.button(
                     "▶ Run OCR + Extraction",
-                    use_container_width=True,
+                    width="stretch",
                     key="run_ocr_extraction_button",
                 )
 
-    if uploaded_file is None:
+    if image_bytes is None:
         st.stop()
 
-    if run_button:
-        run_pipeline(
-            image_path=st.session_state["image_path"],
-            receipt_id=st.session_state["receipt_id"],
-            lang=lang,
-            item_parser_mode=item_parser_mode,
-        )
+    if run_button and "result_dict" not in st.session_state:
+        try:
+            run_pipeline(image_bytes, receipt_id, lang, item_parser_mode)
+        except Exception as exc:
+            st.error(f"Extraction failed ({type(exc).__name__}). Check the local OCR setup and retry.")
+            st.stop()
 
     if "result_dict" not in st.session_state:
         st.markdown(
@@ -1286,7 +1281,8 @@ def main() -> None:
     items_df = st.session_state["items_df"]
     ocr_text = st.session_state["ocr_text"]
     ocr_lines = st.session_state["ocr_lines"]
-    receipt_id = st.session_state["receipt_id"]
+    if result_dict.get("item_parser_version") == "text_based_fallback":
+        st.warning("The layout candidate could not extract items. Showing text-based results.")
 
     st.divider()
 
@@ -1298,7 +1294,9 @@ def main() -> None:
             "JSON",
             "Database",
             "Download",
-        ]
+        ],
+        key="result_tab",
+        on_change="rerun",
     )
 
     with overview_tab:
@@ -1315,7 +1313,7 @@ def main() -> None:
                     items_df,
                     numeric_columns=ITEM_TABLE_NUMERIC_COLUMNS,
                 ),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -1364,7 +1362,7 @@ def main() -> None:
                 ]
             )
 
-            st.dataframe(confidence_df, use_container_width=True, hide_index=True)
+            st.dataframe(confidence_df, width="stretch", hide_index=True)
 
         if show_ocr_json:
             st.markdown("#### 🗃️ OCR JSON")
@@ -1378,7 +1376,7 @@ def main() -> None:
         render_database_tab(result_dict)
 
     with download_tab:
-        render_download_tab(result_dict, items_df, receipt_id)
+        render_download_tab(result_dict, receipt_id)
 
 
 if __name__ == "__main__":

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import csv
+import re
 from collections import Counter
 from dataclasses import dataclass
-from pathlib import Path
+from hashlib import sha256
+from pathlib import Path, PureWindowsPath
 
 
 ALLOWED_SPLITS = frozenset({"development", "held_out"})
@@ -32,7 +34,8 @@ def _relative_path(value: str, field: str, row_number: int) -> Path:
             f"Row {row_number}: {field} must not be empty."
         )
 
-    if path.is_absolute() or ".." in path.parts:
+    windows_path = PureWindowsPath(value.strip())
+    if path.anchor or windows_path.anchor or ".." in windows_path.parts:
         raise ManifestValidationError(
             f"Row {row_number}: {field} must be a safe repository-relative path."
         )
@@ -53,8 +56,10 @@ def load_dataset_manifest(
         raise ManifestValidationError(f"Manifest not found: {manifest_path}")
 
     root = Path(project_root) if project_root is not None else Path.cwd()
+    root = root.resolve()
     records: list[DatasetRecord] = []
     seen_receipt_ids: set[str] = set()
+    seen_paths: dict[str, set[Path]] = {"image_path": set(), "ground_truth_path": set()}
 
     with manifest_path.open("r", encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file)
@@ -75,7 +80,12 @@ def load_dataset_manifest(
                     f"Row {row_number}: receipt_id must not be empty."
                 )
 
-            if receipt_id in seen_receipt_ids:
+            if not re.fullmatch(r"[A-Za-z0-9_-]+", receipt_id):
+                raise ManifestValidationError(
+                    f"Row {row_number}: receipt_id must contain only letters, digits, underscores, or hyphens."
+                )
+            normalized_id = receipt_id.casefold()
+            if normalized_id in seen_receipt_ids:
                 raise ManifestValidationError(
                     f"Row {row_number}: duplicate receipt_id '{receipt_id}'."
                 )
@@ -97,18 +107,24 @@ def load_dataset_manifest(
                 row_number,
             )
 
-            if check_files:
-                for field, relative_path in (
-                    ("image_path", image_path),
-                    ("ground_truth_path", ground_truth_path),
-                ):
-                    if not (root / relative_path).is_file():
-                        raise ManifestValidationError(
-                            f"Row {row_number}: {field} does not exist: "
-                            f"{relative_path}"
-                        )
+            for field, relative_path in (
+                ("image_path", image_path),
+                ("ground_truth_path", ground_truth_path),
+            ):
+                resolved_path = (root / relative_path).resolve()
+                if not resolved_path.is_relative_to(root):
+                    raise ManifestValidationError(
+                        f"Row {row_number}: {field} must stay inside the repository."
+                    )
+                if resolved_path in seen_paths[field]:
+                    raise ManifestValidationError(f"Row {row_number}: duplicate {field}.")
+                seen_paths[field].add(resolved_path)
+                if check_files and not resolved_path.is_file():
+                    raise ManifestValidationError(
+                        f"Row {row_number}: {field} does not exist: {relative_path}"
+                    )
 
-            seen_receipt_ids.add(receipt_id)
+            seen_receipt_ids.add(normalized_id)
             records.append(
                 DatasetRecord(
                     receipt_id=receipt_id,
@@ -120,6 +136,14 @@ def load_dataset_manifest(
 
     if not records:
         raise ManifestValidationError("Manifest must contain at least one record.")
+
+    if check_files and len({record.split for record in records}) > 1:
+        image_splits: dict[bytes, str] = {}
+        for record in records:
+            digest = sha256((root / record.image_path).read_bytes()).digest()
+            previous_split = image_splits.setdefault(digest, record.split)
+            if previous_split != record.split:
+                raise ManifestValidationError("An identical image appears in both dataset splits.")
 
     return records
 

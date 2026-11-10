@@ -8,15 +8,17 @@ An end-to-end system for extracting structured information from Vietnamese recei
 - Provides a stable text parser and an optional layout-aware item parser candidate.
 - Includes manual labels, split-aware evaluators, error analysis, and regression tests.
 - Exposes OCR, parser selection, database storage, and export through Streamlit.
-- Keeps private receipt data and generated artifacts out of Git while tracking an anonymized public sample.
+- Keeps the local benchmark and generated artifacts out of Git and provides a synthetic receipt for the public demo.
 
 ## Evaluation Context
 
 The reported numbers come from a **15-receipt / 39-item MVP development benchmark**. These receipts were used during parser development and error analysis, so the results are **not held-out test estimates**.
 
-The private benchmark and generated artifacts are not committed. A fresh public checkout can inspect the tracked sample and evaluation code, but it cannot independently reproduce the aggregate figures below.
+The aggregate figures were reproduced locally with the private labels, saved artifacts, and a fresh CPU OCR run on all 15 images. A public checkout includes a synthetic smoke-test receipt and the evaluation code. Reproducing the aggregate requires access to the full private benchmark.
 
 ## Demo
+
+These screenshots show the synthetic receipt in a separate local database seeded only by the demo run.
 
 | Upload and preview | Structured extraction |
 | --- | --- |
@@ -32,6 +34,9 @@ The private benchmark and generated artifacts are not committed. A fresh public 
 
 ```text
 Receipt image
+    │
+    ▼
+OpenCV image decoding
     │
     ▼
 PaddleOCR ──► text, confidence, bounding boxes
@@ -97,11 +102,11 @@ The 100% layout-aware result is a prototype result on the **same development dat
 - Receipt accuracy averages correct decisions across six fields.
 - Store names pass at normalized similarity `>= 0.75`.
 - Invoice IDs pass on exact normalized match or similarity `>= 0.85`.
-- A datetime can pass when the date matches even if OCR misses the time.
+- A datetime passes if the date matches, including cases where the time differs or is missing.
 - Item rows are aligned by receipt order, not optimal assignment.
 - Item names pass at normalized similarity `>= 0.75`.
-- Numeric item fields use exact equality after normalization.
-- Overall item-field accuracy is the unweighted mean of name, quantity, unit-price, and line-total accuracies; item-count accuracy is reported separately.
+- Numeric item fields match within an absolute tolerance of `1e-6` after normalization. Two absent numeric values match.
+- Overall item-field accuracy is the unweighted mean of name, quantity, unit-price, and line-total accuracies on labeled item rows. Item-count accuracy separately reports exact agreement between predicted and labeled row counts per receipt.
 
 See [Development Evaluation](docs/evaluation.md) for the full protocol, per-field tables, reproduction limits, and error discussion.
 
@@ -116,7 +121,7 @@ See [Development Evaluation](docs/evaluation.md) for the full protocol, per-fiel
 | Persistence | SQLite |
 | Tests | pytest |
 
-Python 3.10 is recommended because the pinned OCR stack may not support newer Python releases consistently.
+The CPU pipeline was tested on Windows x64 with Python 3.10, PaddleOCR 2.7.3, PaddlePaddle 2.6.2, and Streamlit 1.57.0.
 
 ## Quick Start
 
@@ -125,8 +130,8 @@ Create an environment and install dependencies:
 ```powershell
 conda create -n receipt-ocr python=3.10 -y
 conda activate receipt-ocr
-pip install --upgrade pip setuptools wheel
-pip install -r requirements.txt
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
 ```
 
 Run tests:
@@ -138,10 +143,10 @@ python -m pytest -q
 Start the Streamlit demo:
 
 ```powershell
-streamlit run app/streamlit_app.py
+python -m streamlit run app/streamlit_app.py --server.address 127.0.0.1
 ```
 
-Run OCR and extraction locally:
+Upload `data/sample/synthetic_receipt.png` to try both parser modes. The first OCR run may download model weights. Run the CLI on locally collected data with the following commands:
 
 ```powershell
 python scripts/run_ocr.py --image data/raw/receipts/receipt_001.png
@@ -152,9 +157,9 @@ For all commands, database operations, layout inspection, correction experiments
 
 ## Public Sample
 
-`data/sample/` contains one anonymized receipt image plus OCR text/boxes, manual ground truth, default extraction, and layout-aware extraction. It is intended for code and data-flow inspection, not aggregate metric reproduction.
+`data/sample/` contains a fictional receipt with OCR text and boxes, labels from the printed fixture, and predictions from both parsers. It is a standalone demo fixture, separate from both benchmark splits.
 
-See [Sample Reproducible Data](data/sample/README.md).
+See [Synthetic Demo Receipt](data/sample/README.md).
 
 ## Split-aware Evaluation
 
@@ -177,7 +182,7 @@ python scripts/evaluate_items.py --split development
 python scripts/evaluate_layout_items.py --split development
 ```
 
-Outputs are isolated by split under `data/evaluation/<split>/`. Evaluation stops instead of writing an empty report when the selected split has no records.
+Outputs are isolated by split under `data/evaluation/<split>/`. Evaluation requires at least one receipt and a matching prediction for every receipt in the selected run.
 
 Do not label the existing 15 receipts as held-out. Add held-out results only after collecting and freezing new receipts that were not used to tune parser rules.
 
@@ -185,9 +190,9 @@ Do not label the existing 15 receipts as held-out. Add held-out results only aft
 
 ```text
 app/                 Streamlit interface
-data/sample/         tracked anonymized sample
+data/sample/         tracked synthetic demo receipt
 docs/                protocol, experiments, errors, and usage
-notebooks/           OCR baseline walkthrough
+notebooks/           reserved for the OCR baseline notebook
 receipt_ocr/         reusable OCR, parser, schema, DB, and evaluator modules
 scripts/             command-line pipeline and evaluation entry points
 tests/               parser, preprocessing, manifest, and evaluator tests
@@ -215,9 +220,10 @@ Private images, annotations, OCR outputs, predictions, evaluation artifacts, and
 - The rule-based parser can fail on unseen layouts and OCR distortions.
 - Store-name and invoice-ID extraction remain heuristic.
 - Order-based item matching is weaker than assignment-based matching.
-- The layout-aware candidate depends on reliable OCR bounding boxes.
+- The layout-aware candidate depends on reliable OCR boxes and groups rows using a fixed pixel tolerance.
+- The English recognition model can miss Vietnamese accents. OpenCV resize, grayscale, denoising, and thresholding are available for experiments.
 - The 100% candidate result has not been validated on a held-out or external dataset.
-- The tracked sample does not reproduce the aggregate metrics.
+- The tracked synthetic sample supports a smoke test. The aggregate metrics require the private benchmark.
 - Optional text correction improved average similarity but not thresholded item-name accuracy.
 
 ## Next Steps

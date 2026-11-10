@@ -50,6 +50,6 @@ _No rows._
 
 - This evaluator currently uses order-based matching. It assumes the predicted item order follows the receipt order.
 - Name matching uses normalized text similarity with a threshold of `0.75`.
-- Numeric fields are evaluated with exact equality after number normalization.
+- Numeric fields match within an absolute tolerance of less than `1e-6` after number normalization.
 - This is a baseline item-level evaluator. Later versions can add fuzzy item alignment and layout-aware matching.
 - The private development inputs and generated evaluation artifacts are not committed, so this aggregate report cannot be regenerated from a fresh public checkout.

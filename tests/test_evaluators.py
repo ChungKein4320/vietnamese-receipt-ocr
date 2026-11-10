@@ -283,3 +283,34 @@ def test_single_receipt_report_cannot_overwrite_full_split_report() -> None:
 
     assert single_report_dir == full_report_dir / "single" / "receipt_001"
     assert single_report_dir != full_report_dir
+
+@pytest.mark.parametrize(
+    ("module", "prediction_dir", "prediction_suffix", "cli_args"),
+    [
+        (evaluate_extraction, "EXTRACTED_RESULT_DIR", "_extracted.json", ["--all"]),
+        (evaluate_items, "EXTRACTED_RESULT_DIR", "_extracted.json", []),
+        (evaluate_layout_items, "LAYOUT_EXTRACTED_RESULT_DIR", "_layout_extracted.json", []),
+    ],
+)
+def test_split_evaluation_fails_if_any_prediction_is_missing(
+    tmp_path, monkeypatch, module, prediction_dir, prediction_suffix, cli_args
+):
+    from receipt_ocr.dataset_manifest import DatasetRecord
+
+    records = [
+        DatasetRecord(rid, "development", Path(f"{rid}.png"), Path(f"label_{rid}.json"))
+        for rid in ("receipt_001", "receipt_002")
+    ]
+    monkeypatch.setattr(module, "load_dataset_manifest", lambda *args, **kwargs: records)
+    monkeypatch.setattr(module, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(module, prediction_dir, tmp_path)
+    monkeypatch.setattr(module, "EVALUATION_DIR", tmp_path / "reports")
+    monkeypatch.setattr("sys.argv", ["evaluate", *cli_args])
+    _write_payload(tmp_path / "label_receipt_001.json", [])
+    _write_payload(tmp_path / f"receipt_001{prediction_suffix}", [])
+    (tmp_path / "label_receipt_002.json").write_text('{"receipt_id":"receipt_002","items":[]}', encoding="utf-8")
+
+    with pytest.raises(SystemExit) as exc:
+        module.main()
+    assert exc.value.code == 2
+    assert not (tmp_path / "reports").exists()

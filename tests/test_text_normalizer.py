@@ -45,6 +45,6 @@ def test_barcode_and_quantity_detection():
 
 
 def test_normalize_datetime_value():
-    assert normalize_datetime_value("15/08/2020 10:28") == "2020-08-15 10:28"
-    assert normalize_datetime_value("2020-08-15 10:28") == "2020-08-15 10:28"
+    assert normalize_datetime_value("14/02/2031 09:42") == "2031-02-14 09:42"
+    assert normalize_datetime_value("2031-02-14 09:42") == "2031-02-14 09:42"
     assert normalize_datetime_value("invalid datetime") is None
